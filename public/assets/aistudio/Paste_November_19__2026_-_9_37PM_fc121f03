@@ -1,0 +1,1589 @@
+# MASTER PROJECT PROMPT
+# Build a Real, Production-Ready AI-First Social Media Agency Operating System
+
+## 1. ROLE AND MISSION
+
+Act as a principal software architect, senior full-stack engineer, AI systems engineer, DevOps engineer, security engineer, database architect, and product designer.
+
+Your mission is to design, implement, test, and prepare a real, production-ready AI-first social media agency and its internal operating platform.
+
+This is NOT a demo, mockup, prototype, simulation, landing-page-only project, or UI exercise.
+
+Build an actual operational business system that a real social media agency can use to manage clients, employees, AI agents, projects, content production, approvals, publishing, analytics, finances, and daily operations.
+
+The platform must use real persistent data, real backend operations, real AI model calls, real integrations, real file storage, real background jobs, and real execution evidence.
+
+**Absolute rule: Never simulate a business operation and present it as real.**
+
+If an integration is not configured, clearly show it as not connected. If an operation fails, show the actual failure. If an agent has not completed a task, never mark it completed.
+
+Do not fabricate clients, accounts, analytics, publishing results, trends, engagement numbers, costs, or agent activity.
+
+---
+
+# 2. BUSINESS MODEL AND SCOPE
+
+Build an internal AI-first social media management agency.
+
+Initial deployment:
+- Internal company use only.
+- One operating company.
+- A small human management team.
+- Multiple specialized AI agents.
+- Multiple real clients.
+- Multiple client brands and social accounts.
+- No public SaaS registration or commercial multi-tenant subscription system at this stage.
+
+The architecture should remain extensible, but do not waste time implementing unnecessary SaaS complexity.
+
+## Services provided by the agency
+
+The platform must support:
+
+1. Social media strategy.
+2. Social media account management.
+3. Brand research and competitor analysis.
+4. Audience research.
+5. Trend discovery and monitoring.
+6. Content strategy and planning.
+7. Monthly content calendars.
+8. Content ideas and creative concepts.
+9. Copywriting and captions.
+10. Short-form video and Reels scripts.
+11. Image and graphic production.
+12. Video and Reels production.
+13. Content quality assurance.
+14. Client review and approval.
+15. Social media scheduling.
+16. Actual publishing to connected social accounts.
+17. Performance monitoring.
+18. Analytics and reporting.
+19. Client relationship management.
+20. Financial tracking and profitability analysis.
+
+---
+
+# 3. NON-NEGOTIABLE PRODUCTION REQUIREMENTS
+
+The following rules apply throughout the project.
+
+## Real data only
+
+- Use a real production database.
+- Persist all important business records.
+- Never use hardcoded dashboard statistics.
+- Never populate production screens with fake records.
+- Never create fake activity logs.
+- Never create fake analytics.
+- Never fabricate publishing statuses.
+- Never display sample agent executions as real executions.
+- Do not silently fall back to mock data when an API fails.
+- Make empty states clear and informative.
+- Seed only essential system configuration, roles, permissions, and reference data.
+- If development fixtures are needed, isolate them from production and make their use explicit.
+
+## Real operations only
+
+Every interactive element must have an actual implemented behavior.
+
+Examples:
+- Creating a client must create a database record.
+- Assigning an agent must create an actual task assignment.
+- Running an agent must invoke a real configured AI provider.
+- Generating an image must call an actual image-generation provider.
+- Generating a video must call an actual video-generation provider.
+- Approving content must create an immutable approval record.
+- Scheduling content must create a persistent publishing job.
+- Publishing must call the actual platform API.
+- Analytics must be retrieved from connected platform accounts.
+- Deleting a record must execute an authorized deletion or archival operation.
+
+No decorative buttons, fake progress indicators, fake notifications, or simulated backend responses.
+
+## Evidence-based completion
+
+An operation can only be marked completed when:
+- The operation actually executed.
+- The backend validated its result.
+- Required outputs were persisted.
+- The execution record was saved.
+- Any relevant external identifier or evidence was recorded.
+
+For example, a successful publishing operation should store:
+- Connected social account ID.
+- External platform post ID.
+- Published URL when available.
+- Actual publication timestamp.
+- API response metadata.
+- Publishing job ID.
+- Final execution status.
+
+## Honest integration status
+
+Each integration must have a real status:
+- Not configured.
+- Configuration incomplete.
+- Connected.
+- Authentication expired.
+- Permission denied.
+- Temporarily unavailable.
+- Error.
+- Disconnected.
+
+Never show an integration as connected before validating its credentials and permissions.
+
+---
+
+# 4. TECHNICAL ARCHITECTURE
+
+Use a modular, maintainable, production-oriented architecture.
+
+Recommended stack:
+
+## Frontend
+- Next.js.
+- React.
+- TypeScript.
+- Tailwind CSS.
+- A consistent, accessible component system.
+- Responsive desktop and mobile layouts.
+- Server-side rendering where appropriate.
+- Strict typing and validation.
+
+## Backend
+- TypeScript backend services.
+- Clearly separated business logic.
+- API routes or dedicated backend services.
+- Agent orchestration service.
+- Workflow execution service.
+- Approval service.
+- Publishing service.
+- Integration adapters.
+- Analytics collection service.
+- Notification service.
+
+## Database
+Prefer PostgreSQL.
+
+Supabase is an acceptable implementation choice for:
+- PostgreSQL.
+- Authentication.
+- Row Level Security.
+- Object Storage.
+- Realtime updates.
+- Durable queues where appropriate.
+
+Do not assume Supabase is configured. Inspect the actual project and available credentials first.
+
+## Storage
+Use secure object storage for:
+- Images.
+- Videos.
+- Documents.
+- Brand assets.
+- Generated content.
+- Client uploads.
+- Reports.
+- Exported files.
+
+Store file metadata and references in the database, not large media blobs.
+
+## Background execution
+Implement durable background processing.
+
+Do not execute long-running AI tasks inside ordinary HTTP requests.
+
+Use persistent jobs and independent workers.
+
+The execution system must support:
+- Queue persistence.
+- Job claiming.
+- Worker execution.
+- Visibility timeouts or leases.
+- Retries.
+- Exponential backoff.
+- Dead-letter or archived failures.
+- Cancellation.
+- Idempotency.
+- Execution timeouts.
+- Recovery after worker crashes.
+- Execution logs.
+- Cost tracking.
+
+A browser closing or a user navigating away must not interrupt an already accepted background job.
+
+## AI provider abstraction
+
+Build provider-independent adapters for:
+- Text generation.
+- Structured outputs.
+- Tool calling.
+- Image generation.
+- Video generation.
+- Embeddings where necessary.
+
+Do not hardcode the entire application around one model provider.
+
+Allow providers and models to be configured independently.
+
+---
+
+# 5. COMPANY ORGANIZATION
+
+Create an internal organizational structure.
+
+The system must support:
+
+- Company management.
+- Departments.
+- Human employees.
+- Job roles.
+- Permissions.
+- AI agents.
+- Reporting relationships.
+- Task assignments.
+- Performance tracking.
+- Audit history.
+
+Suggested departments:
+
+1. Executive Management.
+2. Strategy and Research.
+3. Social Media Management.
+4. Content and Copywriting.
+5. Graphic Design.
+6. Video Production.
+7. Quality Assurance.
+8. Client Success.
+9. Publishing and Distribution.
+10. Analytics and Reporting.
+11. Finance and Operations.
+
+Allow authorized administrators to modify the organization structure.
+
+---
+
+# 6. AI AGENT WORKFORCE
+
+AI agents must function as actual operational workers.
+
+They must not be simple chatbots or static profile cards.
+
+Each agent must have:
+
+- Unique ID.
+- Name.
+- Department.
+- Job title.
+- Role description.
+- Manager or supervisor.
+- System instructions.
+- Prompt version.
+- Model provider.
+- Model identifier.
+- Allowed tools.
+- Permission policies.
+- Budget limits.
+- Token limits where applicable.
+- Timeout configuration.
+- Retry configuration.
+- Input schema.
+- Output schema.
+- Quality requirements.
+- Performance metrics.
+- Execution history.
+- Error history.
+- Cost history.
+- Active/paused status.
+
+## Initial AI workforce
+
+Create configurable agent definitions for the following roles.
+
+### 1. AI Operations Manager
+Responsibilities:
+- Receive operational requests.
+- Break work into tasks.
+- Assign work to specialized agents.
+- Track dependencies.
+- Monitor deadlines.
+- Identify failures.
+- Escalate important decisions to humans.
+- Produce operational summaries.
+
+It must not approve its own high-risk actions.
+
+### 2. Research Agent
+Responsibilities:
+- Research client industries.
+- Research target audiences.
+- Identify competitors.
+- Collect reliable sources.
+- Monitor relevant trends.
+- Record source URLs.
+- Record observation dates.
+- Identify unsupported claims.
+- Produce structured research reports.
+
+### 3. Strategy Agent
+Responsibilities:
+- Develop social media strategies.
+- Define content pillars.
+- Recommend platforms.
+- Develop audience positioning.
+- Prepare monthly strategies.
+- Recommend measurable objectives.
+- Create strategic briefs.
+
+### 4. Social Media Manager Agent
+Responsibilities:
+- Manage assigned client workflows.
+- Prepare content plans.
+- Monitor content deadlines.
+- Coordinate content production.
+- Maintain calendars.
+- Identify missing deliverables.
+
+### 5. Content Planner Agent
+Responsibilities:
+- Generate content ideas.
+- Organize ideas by content pillar.
+- Build monthly content calendars.
+- Match formats to platforms.
+- Avoid repetitive ideas.
+- Respect brand requirements.
+
+### 6. Copywriter Agent
+Responsibilities:
+- Write captions.
+- Write posts.
+- Create hooks.
+- Write scripts.
+- Write calls to action.
+- Adapt language and tone.
+- Produce platform-specific variations.
+
+### 7. Creative Director Agent
+Responsibilities:
+- Translate briefs into creative concepts.
+- Define visual directions.
+- Prepare image-generation briefs.
+- Evaluate visual consistency.
+- Check alignment with brand identity.
+
+### 8. Image Generation Agent
+Responsibilities:
+- Prepare prompts.
+- Use a configured image-generation provider.
+- Generate actual images.
+- Store generated files.
+- Record provider and model.
+- Record generation settings and cost.
+- Return asset references.
+
+### 9. Video Production Agent
+Responsibilities:
+- Prepare video briefs.
+- Generate scripts and storyboards.
+- Use configured video tools or providers.
+- Track asynchronous video-generation jobs.
+- Store completed video files.
+- Record technical metadata and costs.
+
+If video generation is not configured, report that capability as unavailable instead of pretending a video was generated.
+
+### 10. Quality Assurance Agent
+Responsibilities:
+- Check spelling.
+- Check factual claims.
+- Check brand voice.
+- Check platform requirements.
+- Check content dimensions.
+- Check media format requirements.
+- Detect duplicate content.
+- Detect missing assets.
+- Identify policy risks.
+- Return structured review results.
+
+### 11. Publishing Coordinator Agent
+Responsibilities:
+- Validate approved content.
+- Validate connected accounts.
+- Validate platform-specific media requirements.
+- Prepare publishing jobs.
+- Monitor actual publishing results.
+- Record external post IDs and URLs.
+- Escalate publishing failures.
+
+It must never bypass required approval.
+
+### 12. Analytics Agent
+Responsibilities:
+- Collect real platform metrics.
+- Compare performance over time.
+- Analyze actual published posts.
+- Identify content patterns.
+- Generate reports.
+- Separate measured facts from interpretations.
+
+### 13. Client Success Agent
+Responsibilities:
+- Prepare client updates.
+- Organize feedback.
+- Track client requests.
+- Prepare meeting summaries.
+- Identify pending approvals.
+- Escalate client concerns.
+
+### 14. Finance Agent
+Responsibilities:
+- Track operational costs.
+- Track AI provider usage.
+- Calculate project expenses.
+- Calculate client profitability.
+- Prepare financial summaries.
+
+It must never invent financial values.
+
+## Agent execution rules
+
+Agents must work through controlled backend tools.
+
+Never allow arbitrary database access or unrestricted tool execution.
+
+Every tool call must be:
+- Authenticated.
+- Authorized.
+- Validated.
+- Logged.
+- Associated with an execution.
+- Subject to applicable limits.
+
+Agents must return structured outputs.
+
+Validate outputs before saving them.
+
+Do not allow agents to mark their own tasks completed without backend validation.
+
+---
+
+# 7. HUMAN APPROVAL AND GOVERNANCE
+
+The platform must operate using a hybrid human-plus-AI management model.
+
+Agents perform routine work autonomously within their permissions.
+
+Humans approve important decisions and external side effects.
+
+Mandatory approval gates include:
+
+- Client strategy approval when required.
+- Content calendar approval when required.
+- Final content approval before publishing.
+- Brand identity changes.
+- External publishing.
+- Financial spending.
+- Advertising spend.
+- Client pricing.
+- Contracts.
+- Sensitive data deletion.
+- New integration authorization.
+- Agent permission changes.
+- New tools with external side effects.
+
+## Immutable approval model
+
+An approval must reference:
+- Exact content ID.
+- Exact content version ID.
+- Reviewer ID.
+- Approval decision.
+- Approval timestamp.
+- Reviewer comments.
+- Relevant attachments.
+- Version hash where appropriate.
+
+Possible decisions:
+- Approved.
+- Rejected.
+- Changes requested.
+
+If content changes materially after approval, invalidate the previous approval and require a new one.
+
+Do not permit an agent to approve its own work when human approval is required.
+
+---
+
+# 8. CLIENT MANAGEMENT AND CRM
+
+Build a real CRM.
+
+Each client must have:
+
+- Client name.
+- Legal or business details where applicable.
+- Industry.
+- Contacts.
+- Email and phone.
+- Client status.
+- Assigned human account manager.
+- Assigned AI agents.
+- Contract information.
+- Service package.
+- Billing information.
+- Start date.
+- Renewal date.
+- Notes.
+- Uploaded files.
+- Communication history.
+- Projects.
+- Campaigns.
+- Social accounts.
+- Brand profiles.
+
+Support multiple brands under one client when needed.
+
+Client data must be accessible only to authorized personnel.
+
+---
+
+# 9. BRAND PROFILE MANAGEMENT
+
+Each client brand must have a versioned brand profile.
+
+Fields include:
+
+- Brand name.
+- Brand description.
+- Industry.
+- Target audience.
+- Audience segments.
+- Brand positioning.
+- Brand personality.
+- Tone of voice.
+- Preferred language.
+- Dialect.
+- Writing style.
+- Preferred expressions.
+- Prohibited expressions.
+- Hashtag preferences.
+- Calls-to-action preferences.
+- Visual identity.
+- Logo files.
+- Color palette.
+- Typography.
+- Visual references.
+- Approved examples.
+- Competitor references.
+- Platform-specific guidelines.
+
+Agents must retrieve the current approved brand profile before creating content.
+
+Brand profile changes must be versioned and auditable.
+
+---
+
+# 10. PROJECTS AND CAMPAIGNS
+
+Implement real project and campaign management.
+
+A project can include:
+- Client.
+- Brand.
+- Objectives.
+- Scope.
+- Deliverables.
+- Budget.
+- Timeline.
+- Assigned team.
+- Assigned agents.
+- Dependencies.
+- Tasks.
+- Assets.
+- Content.
+- Approvals.
+- Reports.
+
+A campaign must support:
+- Campaign name.
+- Objective.
+- Audience.
+- Platforms.
+- Start and end dates.
+- Budget.
+- Creative direction.
+- Content items.
+- Performance indicators.
+- Results.
+
+---
+
+# 11. CONTENT MANAGEMENT SYSTEM
+
+Build a complete Content Studio.
+
+Content types:
+- Static posts.
+- Carousels.
+- Stories.
+- Reels.
+- Short-form videos.
+- Long-form videos.
+- Text posts.
+- Educational content.
+- Promotional content.
+- Campaign content.
+
+Each content item must include:
+- Client ID.
+- Brand ID.
+- Project ID where applicable.
+- Campaign ID where applicable.
+- Platform.
+- Content format.
+- Title.
+- Brief.
+- Caption.
+- Script.
+- Hashtags.
+- CTA.
+- Media assets.
+- Assigned agent.
+- Human owner.
+- Scheduled date.
+- Actual publication date.
+- Status.
+- Version history.
+- Approval history.
+- Publishing history.
+- Performance data.
+
+## Content workflow
+
+Support this workflow:
+
+1. Idea.
+2. Brief.
+3. Strategy review.
+4. Draft.
+5. Creative production.
+6. Quality assurance.
+7. Human review.
+8. Changes requested.
+9. Approved.
+10. Scheduled.
+11. Publishing.
+12. Published.
+13. Analytics collection.
+14. Archived.
+
+Statuses must reflect actual persisted workflow state.
+
+Do not allow illegal state transitions.
+
+---
+
+# 12. TREND INTELLIGENCE AND COMPETITOR RESEARCH
+
+Build a real research system.
+
+Collect information through configured and permitted research sources.
+
+Each trend record must contain:
+- Trend title.
+- Description.
+- Source.
+- Source URL.
+- Date observed.
+- Original publication date if available.
+- Platform.
+- Geographic relevance.
+- Language.
+- Industry.
+- Supporting evidence.
+- Confidence level.
+- Relevance score.
+- Risk assessment.
+- Suggested content opportunities.
+- Related clients.
+- Research execution ID.
+
+Distinguish:
+- Verified information.
+- Source-reported information.
+- AI interpretation.
+- Unverified claims.
+
+Never present an AI-generated idea as an observed real-world trend.
+
+Never invent source URLs.
+
+Store evidence and timestamps.
+
+Respect source terms, rate limits, robots restrictions, and API policies.
+
+Do not scrape private or unauthorized data.
+
+---
+
+# 13. REAL IMAGE AND VIDEO PRODUCTION
+
+Create provider adapters for image and video production.
+
+## Image generation
+
+Support:
+- Prompt generation.
+- Reference assets.
+- Aspect ratios.
+- Resolution.
+- Brand consistency instructions.
+- Provider selection.
+- Model selection.
+- Generation status.
+- Output validation.
+- File storage.
+- Cost records.
+
+## Video generation
+
+Support:
+- Video brief.
+- Script.
+- Storyboard.
+- Reference media.
+- Aspect ratio.
+- Resolution.
+- Duration.
+- Provider selection.
+- Asynchronous job tracking.
+- Webhook or polling completion.
+- Output validation.
+- Storage.
+- Cost records.
+
+A provider must be configured before its feature is available.
+
+A failed generation must remain failed or retrying according to actual execution status.
+
+Never return a placeholder file as generated content.
+
+---
+
+# 14. SOCIAL MEDIA INTEGRATIONS
+
+Implement official integrations through supported platform APIs.
+
+Prioritize:
+- Instagram.
+- Facebook.
+- TikTok.
+- YouTube.
+- LinkedIn.
+- Other platforms when officially supported and justified.
+
+Use OAuth wherever applicable.
+
+Never request users' social media passwords.
+
+Store credentials securely.
+
+Implement:
+- OAuth authorization.
+- Permission validation.
+- Token refresh.
+- Token expiration detection.
+- Account disconnection.
+- Publishing.
+- Media upload.
+- Scheduled publishing.
+- Publishing status checks.
+- Error handling.
+- Analytics retrieval.
+- Rate-limit handling.
+
+## Important platform restrictions
+
+Do not assume every platform supports every publishing format.
+
+Before implementation:
+- Review current official API documentation.
+- Identify required scopes.
+- Identify app-review requirements.
+- Identify account eligibility.
+- Identify media restrictions.
+- Identify rate limits.
+- Identify publishing limitations.
+
+Display unsupported features honestly.
+
+If platform approval is pending, show the integration as restricted or awaiting approval.
+
+Publishing must be performed only after the appropriate human approval.
+
+Use idempotency keys and reconciliation logic to avoid duplicate posts after network failures.
+
+Record external platform IDs and returned URLs.
+
+---
+
+# 15. PUBLISHING ENGINE
+
+Build a reliable publishing engine.
+
+Each publishing job must have:
+- Content version.
+- Social account.
+- Platform.
+- Scheduled time.
+- Approval reference.
+- Job ID.
+- Idempotency key.
+- Execution attempts.
+- Last error.
+- External post ID.
+- External post URL.
+- Actual publication timestamp.
+
+Publishing states:
+- Waiting for approval.
+- Approved.
+- Scheduled.
+- Queued.
+- Publishing.
+- Published.
+- Failed.
+- Retry scheduled.
+- Cancelled.
+- Unknown outcome / reconciliation required.
+
+A timeout must not automatically be interpreted as a failed publication.
+
+When the platform's response is uncertain, reconcile against the external platform before attempting another publish.
+
+Never publish an unapproved content version.
+
+---
+
+# 16. ANALYTICS AND REPORTING
+
+Build analytics using real platform data.
+
+Support:
+- Followers.
+- Reach.
+- Impressions.
+- Engagement.
+- Engagement rate.
+- Likes.
+- Comments.
+- Shares.
+- Saves.
+- Video views.
+- Watch time when available.
+- Link clicks when available.
+- Post-level performance.
+- Account-level performance.
+- Campaign performance.
+- Period comparisons.
+
+Only display metrics actually returned by the connected platform or calculated from documented source metrics.
+
+For every metric, preserve:
+- Source platform.
+- Account.
+- Metric name.
+- Value.
+- Measurement period.
+- Collection timestamp.
+- External source reference.
+- Calculation method where derived.
+
+Clearly distinguish unavailable metrics from zero values.
+
+Show the last successful synchronization time.
+
+Never invent missing values.
+
+---
+
+# 17. FINANCE AND COST MANAGEMENT
+
+Build internal financial tracking.
+
+Track:
+- Client revenue.
+- Contract value.
+- Invoices.
+- Payments.
+- Outstanding balances.
+- Project expenses.
+- AI model costs.
+- Image-generation costs.
+- Video-generation costs.
+- Storage costs when available.
+- Integration costs.
+- Employee expenses where authorized.
+- Campaign costs.
+- Profitability.
+
+Calculate project and client profitability using actual recorded values.
+
+Distinguish actual expenses from estimates.
+
+Agents must not execute financial transactions without explicit authorization.
+
+---
+
+# 18. TASK AND WORKFLOW ENGINE
+
+Create a complete operational task system.
+
+Task fields:
+- Title.
+- Description.
+- Task type.
+- Client.
+- Project.
+- Campaign.
+- Department.
+- Assigned human.
+- Assigned agent.
+- Priority.
+- Due date.
+- Dependencies.
+- Inputs.
+- Required tools.
+- Expected output schema.
+- Result files.
+- Execution history.
+- Approval requirement.
+- Status.
+
+Task statuses:
+- Queued.
+- Assigned.
+- Running.
+- Validating.
+- Waiting for input.
+- Waiting for approval.
+- In review.
+- Completed.
+- Failed.
+- Retrying.
+- Rejected.
+- Cancelled.
+
+Implement:
+- List view.
+- Kanban view.
+- Calendar view.
+- Filters.
+- Search.
+- Assignment.
+- Dependencies.
+- Deadlines.
+- Comments.
+- Attachments.
+- Activity history.
+
+A task must not become completed merely because an agent response was received.
+
+Validate required deliverables first.
+
+---
+
+# 19. APPLICATION SCREENS
+
+Build the following real screens.
+
+1. Login and authentication.
+2. Main dashboard.
+3. Company overview.
+4. Departments.
+5. Employees.
+6. Roles and permissions.
+7. AI Agent Center.
+8. Agent details and configuration.
+9. Agent execution history.
+10. Client CRM.
+11. Client details.
+12. Brand profiles.
+13. Projects.
+14. Campaigns.
+15. Content Studio.
+16. Content calendar.
+17. Content details and versions.
+18. Approval Center.
+19. Publishing Center.
+20. Trend Intelligence.
+21. Competitor Research.
+22. Task Center.
+23. Asset Library.
+24. Analytics.
+25. Financial Management.
+26. Integrations.
+27. Notifications.
+28. Audit Logs.
+29. System Health and Monitoring.
+30. Settings.
+
+All screens must be connected to actual backend functionality.
+
+## Dashboard
+
+Display actual database-derived information, such as:
+- Active clients.
+- Active projects.
+- Pending tasks.
+- Overdue tasks.
+- Pending approvals.
+- Published content.
+- Failed executions.
+- Agent workload.
+- Actual expenses.
+- Revenue.
+- Recent activity.
+
+If data is unavailable, display an honest empty state.
+
+---
+
+# 20. DATABASE DESIGN
+
+Design a normalized PostgreSQL schema with proper foreign keys, indexes, constraints, and migrations.
+
+Core entities should include:
+
+- organizations
+- users
+- departments
+- roles
+- permissions
+- role_permissions
+- user_roles
+- employees
+- agents
+- agent_versions
+- agent_tools
+- agent_policies
+- clients
+- client_contacts
+- client_brands
+- client_brand_versions
+- client_social_accounts
+- projects
+- campaigns
+- campaign_members
+- content_calendars
+- content_items
+- content_versions
+- assets
+- asset_versions
+- trends
+- trend_sources
+- trend_recommendations
+- tasks
+- task_dependencies
+- task_runs
+- workflow_definitions
+- workflow_versions
+- workflow_runs
+- workflow_steps
+- approval_requests
+- approval_decisions
+- comments
+- integrations
+- integration_accounts
+- publishing_jobs
+- publishing_attempts
+- performance_metrics
+- analytics_sync_runs
+- invoices
+- payments
+- expenses
+- usage_records
+- notifications
+- audit_logs
+- system_events
+
+Adjust the schema based on actual requirements.
+
+Important implementation requirements:
+- UUID primary keys.
+- Foreign key integrity.
+- Appropriate indexes.
+- Unique constraints.
+- Check constraints.
+- Timestamps.
+- Soft deletion only where justified.
+- Immutable audit and approval history.
+- Versioned content and brand records.
+- Secure integration credential references.
+- Organization and client access boundaries.
+
+Do not store API secrets in plain text database fields.
+
+Do not store large media files in PostgreSQL.
+
+Use database migrations and version control.
+
+---
+
+# 21. SECURITY
+
+Security is a release requirement, not a later enhancement.
+
+Implement:
+
+- Secure authentication.
+- Session management.
+- Role-based access control.
+- Server-side permission checks.
+- Database-level access protection.
+- Row Level Security where appropriate.
+- Secure secret storage.
+- Input validation.
+- Output validation.
+- CSRF protection where applicable.
+- XSS protection.
+- SQL injection protection.
+- Rate limiting.
+- File upload validation.
+- Signed media URLs.
+- Audit logging.
+- Secure error handling.
+- Sensitive-data redaction.
+- Least-privilege service credentials.
+
+AI agents must have narrowly scoped permissions.
+
+Do not expose service-role keys or provider secrets to frontend code.
+
+Never trust frontend authorization decisions.
+
+Do not allow AI-generated instructions or user-provided content to override system permissions.
+
+Treat external content, retrieved webpages, uploaded documents, and tool outputs as untrusted input.
+
+Protect against prompt injection and unauthorized tool invocation.
+
+---
+
+# 22. OBSERVABILITY AND OPERATIONS
+
+Implement real monitoring.
+
+Track:
+- API errors.
+- Backend errors.
+- Worker health.
+- Queue depth.
+- Failed jobs.
+- Retry rates.
+- AI provider latency.
+- Token usage.
+- AI cost.
+- Image-generation cost.
+- Video-generation cost.
+- Publishing failures.
+- Integration health.
+- Database health.
+- Storage errors.
+
+Use structured logs and correlation IDs.
+
+Every task execution should be traceable from:
+- User request.
+- Task.
+- Agent run.
+- Model request.
+- Tool calls.
+- Generated assets.
+- Approval.
+- External side effect.
+- Final result.
+
+Provide actionable error messages without leaking secrets.
+
+Implement alerting for critical failures.
+
+---
+
+# 23. TESTING REQUIREMENTS
+
+Create real automated tests.
+
+## Unit tests
+Test:
+- Business logic.
+- Permissions.
+- Validation.
+- Workflow transitions.
+- Approval rules.
+- Cost calculations.
+- Idempotency logic.
+
+## Integration tests
+Test:
+- Database operations.
+- Authentication.
+- Storage.
+- Queue processing.
+- Agent execution.
+- Provider adapters.
+- OAuth flows where possible.
+- Publishing adapters.
+- Analytics adapters.
+
+## End-to-end tests
+Test complete user journeys.
+
+Example:
+1. Create a client.
+2. Create a brand profile.
+3. Connect an authorized social account.
+4. Create a project.
+5. Create a content brief.
+6. Assign agents.
+7. Generate actual content.
+8. Generate or upload actual media.
+9. Run QA.
+10. Submit for human approval.
+11. Approve a specific content version.
+12. Schedule publication.
+13. Publish to an authorized account.
+14. Confirm the actual external post.
+15. Retrieve real analytics.
+
+Use isolated test accounts and environments.
+
+Never publish test content to a real client account without explicit authorization.
+
+## Failure testing
+
+Test:
+- Worker crashes.
+- Provider timeouts.
+- API rate limits.
+- Invalid credentials.
+- Expired tokens.
+- Duplicate requests.
+- Database interruptions.
+- Storage failures.
+- Publishing uncertainty.
+- Retried jobs.
+- Permission denial.
+
+---
+
+# 24. DEPLOYMENT AND PRODUCTION READINESS
+
+Prepare the application for real deployment.
+
+Implement:
+- Production build.
+- Environment-specific configuration.
+- Secure environment variables.
+- Database migrations.
+- Background worker deployment.
+- Queue configuration.
+- Storage configuration.
+- Domain and HTTPS readiness.
+- Error monitoring.
+- Health checks.
+- Backup and restore procedures.
+- Deployment documentation.
+- Rollback strategy.
+- Database migration strategy.
+- Operational runbooks.
+
+Never expose secrets in source control.
+
+Provide an `.env.example` containing variable names and descriptions only, never real credentials.
+
+Do not claim backups work until restore has been tested.
+
+Do not claim deployment is complete unless the actual deployment has succeeded and been verified.
+
+Do not claim production readiness while critical security, data integrity, or operational checks are failing.
+
+---
+
+# 25. DEVELOPMENT EXECUTION STRATEGY
+
+Work in controlled phases.
+
+Do not attempt to create every screen superficially in one pass.
+
+## Phase 1 — Inspect and plan
+
+- Inspect the existing repository.
+- Identify the current stack.
+- Inspect existing database configuration.
+- Inspect available integrations.
+- Inspect environment configuration without exposing secrets.
+- Identify existing functionality.
+- Identify missing functionality.
+- Identify technical risks.
+- Produce an implementation plan.
+
+Do not overwrite existing working functionality without understanding it.
+
+If no repository exists, request permission or the required project location before creating a new one.
+
+## Phase 2 — Foundation
+
+Implement:
+- Application structure.
+- Authentication.
+- Database schema.
+- Migrations.
+- Authorization.
+- Storage.
+- Logging.
+- Error handling.
+- Background queue.
+- Worker infrastructure.
+
+## Phase 3 — Core company operations
+
+Implement:
+- Organization.
+- Departments.
+- Employees.
+- Clients.
+- Brand profiles.
+- Projects.
+- Campaigns.
+- Tasks.
+- Assets.
+
+## Phase 4 — AI workforce
+
+Implement:
+- Agent registry.
+- Agent configuration.
+- Model provider adapters.
+- Tool permissions.
+- Orchestration.
+- Execution tracking.
+- Structured outputs.
+- Cost tracking.
+- Retries.
+- Human escalation.
+
+## Phase 5 — Content production
+
+Implement:
+- Content planning.
+- Content Studio.
+- Copywriting.
+- Image generation.
+- Video production integrations.
+- QA.
+- Versioning.
+- Approval workflows.
+
+## Phase 6 — External integrations
+
+Implement:
+- OAuth.
+- Social accounts.
+- Publishing adapters.
+- Publishing scheduler.
+- Status reconciliation.
+- Analytics collection.
+
+## Phase 7 — Finance and reporting
+
+Implement:
+- Cost tracking.
+- Revenue.
+- Expenses.
+- Client profitability.
+- Analytics reports.
+
+## Phase 8 — Production hardening
+
+Implement and verify:
+- Security.
+- Automated tests.
+- Performance.
+- Recovery.
+- Backups.
+- Monitoring.
+- Deployment.
+- Documentation.
+
+---
+
+# 26. DEVELOPMENT RULES
+
+Follow these rules throughout implementation:
+
+1. Do not build a fake prototype.
+2. Do not use mock business data in production.
+3. Do not use hardcoded dashboard metrics.
+4. Do not fake agent activity.
+5. Do not fake API responses.
+6. Do not fake publishing.
+7. Do not fake analytics.
+8. Do not claim integrations are connected when they are not.
+9. Do not claim a feature is complete if it is only a UI.
+10. Do not create nonfunctional buttons.
+11. Do not silently swallow errors.
+12. Do not ignore failed background jobs.
+13. Do not allow unauthorized external actions.
+14. Do not allow agents to bypass approval rules.
+15. Do not expose credentials.
+16. Do not skip database migrations.
+17. Do not skip tests for critical workflows.
+18. Do not leave critical functionality as TODOs while calling the product production-ready.
+19. Do not replace real execution with hardcoded success responses.
+20. Do not claim completion without evidence.
+
+When a provider or API is unavailable:
+- Implement the proper adapter interface.
+- Clearly mark the integration as unconfigured.
+- Explain the missing credential, permission, or approval.
+- Do not fabricate a successful result.
+
+When requirements are ambiguous:
+- Ask a focused question before implementing consequential behavior.
+- Otherwise document the assumption and keep it configurable.
+
+Prioritize correctness, security, reliability, and maintainability over visual shortcuts.
+
+---
+
+# 27. REQUIRED DELIVERABLES
+
+The finished project must include:
+
+1. Complete working application source code.
+2. Database schema and migrations.
+3. Authentication and permissions.
+4. Real backend services.
+5. AI agent orchestration.
+6. Durable background workers.
+7. Real file storage.
+8. Provider integration adapters.
+9. Social platform integration adapters.
+10. Publishing and approval workflows.
+11. Analytics collection.
+12. Finance and cost tracking.
+13. Automated tests.
+14. Deployment configuration.
+15. Environment variable documentation.
+16. API documentation.
+17. Architecture documentation.
+18. Database documentation.
+19. Security documentation.
+20. Operations and troubleshooting guide.
+21. Production readiness checklist.
+
+---
+
+# 28. DEFINITION OF DONE
+
+The system is not complete simply because the UI looks finished.
+
+A feature is complete only when:
+- Its frontend exists.
+- Its backend exists.
+- Its database operations work.
+- Its authorization works.
+- Its validation works.
+- Its errors are handled.
+- Its tests pass.
+- Its execution is observable.
+- Its documentation exists.
+
+The overall system cannot be called production-ready until the following critical path has been demonstrated in a real, authorized environment:
+
+### Required end-to-end acceptance test
+
+1. An administrator logs in.
+2. The administrator creates a real client.
+3. A real brand profile is saved.
+4. A real project is created.
+5. A real social account is connected through official authorization.
+6. An AI agent receives an actual task.
+7. The agent calls a real configured AI model.
+8. The agent produces real content.
+9. Actual media is generated or uploaded.
+10. The content passes validation.
+11. A human reviews and approves the exact content version.
+12. The publishing system schedules the approved version.
+13. A real publishing API call is made.
+14. The external platform confirms the publication.
+15. The external post ID and URL are saved.
+16. Analytics are retrieved from the actual platform when available.
+17. Costs and execution records are persisted.
+18. The complete activity history can be inspected.
+
+If any external integration requires additional credentials, account eligibility, platform approval, or manual authorization, report that dependency explicitly.
+
+Do not falsely mark the acceptance test as passed.
+
+---
+
+# 29. FINAL REPORTING REQUIREMENTS
+
+At the end of each implementation phase, report:
+
+- What was implemented.
+- Which files were created or modified.
+- Which database migrations were added.
+- Which tests were executed.
+- Which tests passed.
+- Which tests failed.
+- Which integrations were actually verified.
+- Which features are still unavailable.
+- Which credentials or permissions are required.
+- Known security risks.
+- Known operational risks.
+- Next implementation steps.
+
+Use three distinct labels:
+
+**IMPLEMENTED AND VERIFIED:** Actually implemented and tested with evidence.
+
+**IMPLEMENTED BUT NOT VERIFIED:** Code exists, but full execution has not been verified.
+
+**NOT IMPLEMENTED / BLOCKED:** Missing implementation, credentials, access, permissions, or external dependencies.
+
+Never mix these categories.
+
+---
+
+# 30. FINAL INSTRUCTION
+
+Your goal is not to deliver a beautiful-looking agency dashboard.
+
+Your goal is to build the real operating infrastructure of an AI-first social media agency.
+
+The AI agents must perform real work.
+
+The humans must retain control over consequential decisions.
+
+The database must contain real operational data.
+
+The integrations must communicate with actual external services.
+
+The background workers must execute reliably.
+
+The publishing engine must publish real approved content.
+
+The analytics must reflect real platform data.
+
+The finance system must use real recorded values.
+
+Every important action must be traceable and auditable.
+
+Start by inspecting the existing project and its environment. Then produce a concrete implementation plan, identify blockers, and begin implementing the foundation.
+
+Do not declare the system production-ready until the required acceptance tests and production checks have actually passed.
+
+**Build the real product. Never simulate the business.**
