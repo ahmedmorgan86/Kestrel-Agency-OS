@@ -70,14 +70,14 @@ interface HqStateResponse {
 }
 
 export function VirtualHqView({
-  initialTab = 'hq3d',
+  initialTab = 'lobby',
   onOpenEmployee,
   onOpenAgent,
   onOpenDepartment,
   onOpenMeeting,
   onNavigate,
 }: {
-  initialTab?: 'hq3d' | 'floor2d' | 'orgchart' | 'directory';
+  initialTab?: 'lobby' | 'hq3d' | 'floor2d' | 'orgchart' | 'directory';
   onOpenEmployee: (employeeId: string) => void;
   onOpenAgent: (agentId: string) => void;
   onOpenDepartment: (departmentId: string) => void;
@@ -85,7 +85,7 @@ export function VirtualHqView({
   onNavigate: (route: string) => void;
 }) {
   const { theme, reducedMotion, setReducedMotion, brand, updateBrandFromOrg } = useThemeAndBrand();
-  const [tab, setTab] = useState<'hq3d' | 'floor2d' | 'orgchart' | 'directory'>(initialTab);
+  const [tab, setTab] = useState<'lobby' | 'hq3d' | 'floor2d' | 'orgchart' | 'directory'>(initialTab);
   const [hq, setHq] = useState<HqStateResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -331,7 +331,8 @@ export function VirtualHqView({
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'hq3d', label: '3D Virtual HQ' },
+            { value: 'lobby', label: 'Lobby Preview' },
+            { value: 'hq3d', label: 'Interactive 3D HQ' },
             { value: 'floor2d', label: '2D Floor Map' },
             { value: 'orgchart', label: 'Org Chart' },
             { value: 'directory', label: 'Department Directory' },
@@ -354,6 +355,60 @@ export function VirtualHqView({
           </span>
         </div>
       </div>
+
+      {tab === 'lobby' && hq && (
+        <section
+          aria-label="MORGAN GROUP headquarters lobby preview"
+          className="relative isolate min-h-[540px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 bg-cover bg-center shadow-2xl"
+          style={{ backgroundImage: 'linear-gradient(90deg, rgba(8,17,24,0.82) 0%, rgba(8,17,24,0.45) 42%, rgba(8,17,24,0.06) 78%), linear-gradient(0deg, rgba(8,17,24,0.92) 0%, rgba(8,17,24,0.05) 44%), url("/assets/morgan-group-lobby.png")' }}
+        >
+          <div className="absolute left-7 top-7 z-10 flex items-center gap-2 rounded-full border border-white/20 bg-slate-950/55 px-3.5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
+            <span className="h-2 w-2 rounded-full bg-teal-300 shadow-[0_0_12px_rgba(94,234,212,0.9)]" />
+            MORGAN GROUP · Headquarters
+          </div>
+          <div className="absolute right-7 top-7 z-10 rounded-full border border-white/20 bg-slate-950/55 px-3.5 py-2 text-xs text-slate-100 backdrop-blur-sm">
+            Virtual company preview
+          </div>
+
+          <div className="relative z-10 flex min-h-[540px] flex-col justify-between p-7 sm:p-10">
+            <div className="max-w-xl pt-16 sm:pt-20">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-200">Technology, built together</p>
+              <h2 className="mt-4 max-w-lg text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl">
+                Welcome to a more human kind of technology company.
+              </h2>
+              <p className="mt-4 max-w-md text-sm leading-6 text-slate-200 sm:text-base">
+                Meet the team, explore the operating floor, and see how people and AI colleagues work together.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button type="button" onClick={() => setTab('hq3d')} className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-lg transition hover:bg-teal-50">
+                  <Layers className="h-4 w-4" aria-hidden="true" /> Explore the interactive HQ
+                </button>
+                <button type="button" onClick={() => onNavigate('employees')} className="rounded-lg border border-white/35 bg-slate-950/25 px-4 py-2.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/10">
+                  Meet the team
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <button type="button" onClick={() => onNavigate('employees')} className="group rounded-xl border border-white/15 bg-slate-950/65 p-4 text-left backdrop-blur-md transition hover:border-teal-200/60 hover:bg-slate-950/80">
+                <span className="flex items-center gap-2 text-xs text-slate-300"><Users className="h-4 w-4 text-teal-200" aria-hidden="true" /> Virtual colleagues</span>
+                <span className="mt-2 block text-2xl font-semibold text-white">{hq.counts.virtualEmployees}</span>
+                <span className="mt-1 block text-xs text-slate-400">Fictional roster, real company structure</span>
+              </button>
+              <button type="button" onClick={() => onNavigate('agents')} className="group rounded-xl border border-white/15 bg-slate-950/65 p-4 text-left backdrop-blur-md transition hover:border-teal-200/60 hover:bg-slate-950/80">
+                <span className="flex items-center gap-2 text-xs text-slate-300"><Sparkles className="h-4 w-4 text-teal-200" aria-hidden="true" /> AI colleagues</span>
+                <span className="mt-2 block text-2xl font-semibold text-white">{hq.counts.totalAgents}</span>
+                <span className="mt-1 block text-xs text-slate-400">Local model setup is available in the HQ map</span>
+              </button>
+              <button type="button" onClick={() => onOpenMeeting()} className="group rounded-xl border border-white/15 bg-slate-950/65 p-4 text-left backdrop-blur-md transition hover:border-teal-200/60 hover:bg-slate-950/80">
+                <span className="flex items-center gap-2 text-xs text-slate-300"><Video className="h-4 w-4 text-teal-200" aria-hidden="true" /> Operating divisions</span>
+                <span className="mt-2 block text-2xl font-semibold text-white">{hq.counts.totalDepartments}</span>
+                <span className="mt-1 block text-xs text-slate-400">Plus {hq.counts.activeMeetings} live meetings</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* TAB 1: 3D VIRTUAL HQ */}
       {tab === 'hq3d' && hq && (

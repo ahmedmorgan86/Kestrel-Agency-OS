@@ -346,7 +346,7 @@ export default function App() {
         return (
           <VirtualHqView
             key="hq-3d"
-            initialTab="hq3d"
+            initialTab="lobby"
             onOpenEmployee={openEmployee}
             onOpenAgent={openAgent}
             onOpenDepartment={openDepartment}
@@ -458,7 +458,7 @@ export default function App() {
       default:
         return (
           <VirtualHqView
-            initialTab="hq3d"
+            initialTab="lobby"
             onOpenEmployee={openEmployee}
             onOpenAgent={openAgent}
             onOpenDepartment={openDepartment}
