@@ -431,13 +431,16 @@ export function VirtualHqView({
             {/* Status Legend Bar */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-400">
               <div className="flex flex-wrap items-center gap-4">
-                <span className="font-semibold text-slate-800 dark:text-slate-200">Honest Operational States:</span>
-                <span>Idle / Standby (Static Pose)</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">Live Operational States:</span>
+                <span>Idle / Standby</span>
                 <span className="text-blue-700 dark:text-blue-400 font-medium">Working (Active Run)</span>
-                <span className="text-indigo-700 dark:text-indigo-400 font-medium">In Meeting (Seated in Room)</span>
+                <span className="text-indigo-700 dark:text-indigo-400 font-medium">In Meeting (Assigned Room)</span>
                 <span className="text-amber-700 dark:text-amber-400 font-medium">Waiting for Approval</span>
                 <span className="text-red-700 dark:text-red-400 font-medium">Failed / Error</span>
               </div>
+              <span className="text-slate-500 dark:text-slate-400" title="Human figures and their short walks are illustrative animation, not employee location tracking.">
+                Virtual people · illustrative movement
+              </span>
               <button
                 type="button"
                 onClick={() => setTab('floor2d')}
