@@ -787,6 +787,7 @@ studioAndGovRouter.patch('/agents/:id', requirePermission('agents:configure'), (
   const ts = nowIso();
   const promptChanged =
     (parsed.data.systemInstructions && parsed.data.systemInstructions !== existing.system_instructions) ||
+    (parsed.data.modelProvider && parsed.data.modelProvider !== existing.model_provider) ||
     (parsed.data.modelIdentifier && parsed.data.modelIdentifier !== existing.model_identifier);
   const nextVersion = promptChanged ? Number(existing.prompt_version) + 1 : Number(existing.prompt_version);
 

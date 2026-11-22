@@ -8,7 +8,9 @@ Copy `.env.example` to `.env` (or configure secrets in your hosting platform):
 - `STORAGE_DIR` — Local blob directory (default `./data/storage`).
 - `SESSION_SECRET` — 32+ byte secret for HMAC session digests and signed URLs.
 - `ENCRYPTION_SECRET` — 32+ byte secret for AES-256-GCM encryption of OAuth tokens.
-- `GEMINI_API_KEY` — Server-side Gemini API key (automatically injected when configured in AI Studio Secrets).
+- `OLLAMA_BASE_URL` — Local Ollama endpoint (defaults to `http://127.0.0.1:11434`).
+- `OLLAMA_MODEL` — Locally installed model (defaults to `qwen3.5:4b`).
+- Optional `GEMINI_API_KEY` — Google AI Studio cloud free tier; separate key, quotas, and provider terms apply.
 - Optional Social OAuth Apps: `META_APP_ID` / `META_APP_SECRET`, `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET`, `X_CLIENT_ID` / `X_CLIENT_SECRET`, `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET`, `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`.
 
 ## 2. Running & Testing
@@ -39,6 +41,15 @@ npm run start         # Runs Express server + background worker on port 3000
 | 14-State Content Workflow & Immutable Approvals | Ready | SHA-256 version locking, auto-invalidation on edit, human-only decisions |
 | Durable Background Worker & Lease Recovery | Ready | Tested for idempotency, cancellation, and stale-lease recovery |
 | Asset Upload & Signed Download URLs | Ready | Disk storage with MIME allowlist, 25MB limit, HMAC signed URLs |
-| Server-Side AI Agent Execution & Search Grounding | Ready (Requires `GEMINI_API_KEY`) | Wired to `@google/genai`; reports honest unconfigured state if key absent |
+| AI Agent Execution | Ready with local Ollama (no API usage fees) | Default is `qwen3.5:4b` on your own machine/server; install Ollama and the model first. Inference speed depends on available memory and hardware. |
+| Cloud AI & Grounded Research | Optional (requires provider key) | Gemini free-tier quota and availability are controlled by Google; web grounding is not provided by local Ollama. |
 | Live Social Publishing & Analytics Sync | Adapter Ready (Requires Platform OAuth Apps) | Official OAuth & API adapters built; requires platform developer credentials |
 | Automated Video Generation | Blocked / Honest Error | No configured video provider; returns explicit unavailable diagnostic |
+
+## 6. Free Local AI Setup
+1. Install Ollama on the same computer or server that runs the application.
+2. Download the default model once with `ollama pull qwen3.5:4b` (approximately 3–4 GB on disk; see the [Ollama model library](https://ollama.com/library/qwen3.5)).
+3. Keep Ollama running, then open **Settings → Integrations** and verify **Ollama Local AI (Free)**.
+4. Agent tasks then run against the local model with zero cloud token charges. Local inference uses the machine's CPU/GPU, disk, and electricity. The free local model does not provide Google Search grounding, image generation, or video generation.
+
+Ollama API connectivity is server-side only. For a separately hosted Ollama instance, set `OLLAMA_BASE_URL` in the server environment; do not expose the local Ollama port to the public internet.

@@ -29,8 +29,8 @@ export function AgentWorkforceView({
   const [runPrompt, setRunPrompt] = useState('');
   const [configForm, setConfigForm] = useState({
     systemInstructions: '',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     monthlyBudgetUsd: '50',
     timeoutSeconds: '60',
     maxRetries: '2',
@@ -56,7 +56,7 @@ export function AgentWorkforceView({
       const a = res.agent;
       setConfigForm({
         systemInstructions: a.system_instructions || '',
-        modelProvider: a.model_provider || 'google_gemini',
+        modelProvider: a.model_provider || 'ollama',
         modelIdentifier: a.model_identifier || 'gemini-4-hydrogen',
         monthlyBudgetUsd: String(a.monthly_budget_usd ?? 50),
         timeoutSeconds: String(a.timeout_seconds ?? 60),
@@ -157,6 +157,7 @@ export function AgentWorkforceView({
                   </FormField>
                   <FormField label="Model Provider" htmlFor="ag-prov">
                     <select id="ag-prov" value={configForm.modelProvider} onChange={(e) => setConfigForm({ ...configForm, modelProvider: e.target.value })} className={INPUT_CLASS}>
+                      <option value="ollama">Ollama Local AI (Free)</option>
                       <option value="google_gemini">Google Gemini</option>
                       <option value="openai">OpenAI (Requires Key)</option>
                       <option value="anthropic">Anthropic (Requires Key)</option>
@@ -171,8 +172,9 @@ export function AgentWorkforceView({
                       className={INPUT_CLASS}
                     />
                     <datalist id="gemini-model-presets">
-                      <option value="gemini-4-hydrogen">gemini-4-hydrogen (Free Tier Default)</option>
-                      <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite (Free Tier Fast)</option>
+                      <option value="qwen3.5:4b">qwen3.5:4b (Local, no API fees)</option>
+                      <option value="qwen3.5:0.8b">qwen3.5:0.8b (Smaller local model)</option>
+                      <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Google free tier, key required)</option>
                       <option value="gemini-4-neon">gemini-4-neon (Paid Key)</option>
                       <option value="gemini-4-carbon">gemini-4-carbon (Paid Key)</option>
                     </datalist>

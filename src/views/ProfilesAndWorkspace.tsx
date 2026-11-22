@@ -662,8 +662,8 @@ export function AiAgentProfileView({
   const [runPrompt, setRunPrompt] = useState('');
   const [configForm, setConfigForm] = useState({
     systemInstructions: '',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     monthlyBudgetUsd: '50',
     timeoutSeconds: '60',
     maxRetries: '2',
@@ -694,7 +694,7 @@ export function AiAgentProfileView({
       const a = res.agent;
       setConfigForm({
         systemInstructions: a.system_instructions || '',
-        modelProvider: a.model_provider || 'google_gemini',
+        modelProvider: a.model_provider || 'ollama',
         modelIdentifier: a.model_identifier || 'gemini-4-hydrogen',
         monthlyBudgetUsd: String(a.monthly_budget_usd ?? 50),
         timeoutSeconds: String(a.timeout_seconds ?? 60),
@@ -1096,6 +1096,7 @@ export function AiAgentProfileView({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <FormField label="Provider" htmlFor="m-prov">
                     <select id="m-prov" value={configForm.modelProvider} onChange={(e) => setConfigForm({ ...configForm, modelProvider: e.target.value })} className={INPUT_CLASS}>
+                      <option value="ollama">Ollama Local AI (Free)</option>
                       <option value="google_gemini">Google Gemini</option>
                       <option value="openai">OpenAI (Requires Key)</option>
                       <option value="anthropic">Anthropic (Requires Key)</option>
@@ -1104,9 +1105,9 @@ export function AiAgentProfileView({
                   <FormField label="Model Identifier" htmlFor="m-id">
                     <input id="m-id" list="profile-model-presets" value={configForm.modelIdentifier} onChange={(e) => setConfigForm({ ...configForm, modelIdentifier: e.target.value })} className={INPUT_CLASS} />
                     <datalist id="profile-model-presets">
-                      <option value="gemini-4-hydrogen">gemini-4-hydrogen (Free Tier)</option>
-                      <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite (Free Tier)</option>
-                      <option value="gemini-4-neon">gemini-4-neon (Paid)</option>
+                      <option value="qwen3.5:4b">qwen3.5:4b (Local, no API fees)</option>
+                      <option value="qwen3.5:0.8b">qwen3.5:0.8b (Smaller local model)</option>
+                      <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Google free tier, key required)</option>
                     </datalist>
                   </FormField>
                   <FormField label="Monthly Budget (USD)" htmlFor="m-bud">

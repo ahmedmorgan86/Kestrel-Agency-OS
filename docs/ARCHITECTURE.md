@@ -33,7 +33,7 @@ Express Server (`server.ts`, port 3000)
    ├── Storage Engine (`server/services/storage.ts`)
    │     └── Disk blob store (`./data/storage/`), MIME allowlist, 25MB cap, SHA-256, HMAC signed URLs
    └── External Adapters
-         ├── `server/services/aiProviders.ts`    (@google/genai server-side text, JSON, grounding, image)
+         ├── `server/services/aiProviders.ts`    (local Ollama text/JSON by default; optional Gemini cloud/grounding/image)
          └── `server/services/socialAdapters.ts` (Official Meta/LinkedIn OAuth & publishing with timeout classification)
 ```
 

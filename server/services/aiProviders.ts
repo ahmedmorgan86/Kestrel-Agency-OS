@@ -57,6 +57,32 @@ export function isGeminiConfigured(): boolean {
   return Boolean(key && key.trim().length > 10 && !key.startsWith('MY_'));
 }
 
+export async function verifyOllamaConnection(): Promise<{ ok: boolean; latencyMs: number; model: string; error?: string }> {
+  const baseUrl = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
+  const model = process.env.OLLAMA_MODEL || 'qwen3.5:4b';
+  const started = Date.now();
+  try {
+    const response = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) throw new Error(`Ollama returned HTTP ${response.status}.`);
+    const payload = (await response.json()) as { models?: Array<{ name?: string }> };
+    const names = (payload.models || []).map((entry) => entry.name || '');
+    const installed = names.some((name) => name === model || name.startsWith(`${model}:`) || model.startsWith(`${name.split(':')[0]}:`));
+    return {
+      ok: installed,
+      latencyMs: Date.now() - started,
+      model,
+      ...(installed ? {} : { error: `Ollama is available, but ${model} is not installed. Run: ollama pull ${model}` }),
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      latencyMs: Date.now() - started,
+      model,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 function createGeminiClient(): GoogleGenAI {
   if (!isGeminiConfigured()) {
     throw new Error(
@@ -94,15 +120,69 @@ function tryExtractJson(raw: string): Record<string, unknown> | null {
 export async function generateStructuredText(
   req: TextGenerationRequest
 ): Promise<TextGenerationResult> {
+  if (req.provider === 'ollama') {
+    if (req.useGoogleSearch) {
+      throw new Error('Grounded web research is unavailable in local free mode. Configure Google Gemini free tier to use Google Search grounding.');
+    }
+    const baseUrl = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
+    const started = Date.now();
+    const model = req.model || process.env.OLLAMA_MODEL || 'qwen3.5:4b';
+    let response: Response;
+    try {
+      response = await fetch(`${baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(Math.max(30, req.timeoutSeconds || 180) * 1000),
+        body: JSON.stringify({
+          model,
+          stream: false,
+          think: false,
+          format: req.expectJson ? 'json' : undefined,
+          messages: [
+            { role: 'system', content: req.systemInstruction },
+            { role: 'user', content: req.prompt },
+          ],
+          options: { temperature: req.expectJson ? 0.2 : 0.65 },
+        }),
+      });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(`Free local AI is unavailable at ${baseUrl}. Start Ollama and install ${model}. (${detail})`);
+    }
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      message?: { content?: string };
+      prompt_eval_count?: number;
+      eval_count?: number;
+    };
+    if (!response.ok) {
+      throw new Error(`Ollama request failed (${response.status}): ${payload.error || response.statusText}`);
+    }
+    const text = (payload.message?.content || '').trim();
+    if (!text) throw new Error(`Local model "${model}" returned an empty response.`);
+    return {
+      provider: 'ollama',
+      model,
+      text,
+      parsedJson: tryExtractJson(text),
+      groundedSources: [],
+      promptTokens: payload.prompt_eval_count || 0,
+      outputTokens: payload.eval_count || 0,
+      latencyMs: Date.now() - started,
+      costUsd: 0,
+      rateCardFound: true,
+    };
+  }
+
   if (req.provider !== 'google_gemini') {
     throw new Error(
-      `AI provider "${req.provider}" is not configured on this server. Configure provider credentials or select "google_gemini".`
+      `AI provider "${req.provider}" is not configured on this server. Select "ollama" for free local inference or configure a cloud provider.`
     );
   }
 
   const ai = createGeminiClient();
   const started = Date.now();
-  const model = req.model || 'gemini-4-hydrogen';
+  const model = req.model || 'gemini-3.5-flash-lite';
 
   const config: Record<string, unknown> = {
     systemInstruction: req.systemInstruction,
@@ -270,7 +350,7 @@ export async function verifyGeminiConnection(): Promise<{
     return {
       ok: false,
       latencyMs: 0,
-      model: 'gemini-4-hydrogen',
+      model: 'gemini-3.5-flash-lite',
       error: 'GEMINI_API_KEY is not configured in server environment secrets.',
     };
   }
@@ -278,20 +358,20 @@ export async function verifyGeminiConnection(): Promise<{
   try {
     const ai = createGeminiClient();
     const res = await ai.models.generateContent({
-      model: 'gemini-4-hydrogen',
+      model: 'gemini-3.5-flash-lite',
       contents: 'Respond with the single word OK.',
     });
     const text = (res.text ?? '').trim();
     return {
       ok: text.length > 0,
       latencyMs: Date.now() - started,
-      model: 'gemini-4-hydrogen',
+      model: 'gemini-3.5-flash-lite',
     };
   } catch (err) {
     return {
       ok: false,
       latencyMs: Date.now() - started,
-      model: 'gemini-4-hydrogen',
+      model: 'gemini-3.5-flash-lite',
       error: err instanceof Error ? err.message : String(err),
     };
   }

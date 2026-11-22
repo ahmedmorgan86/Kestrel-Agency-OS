@@ -3,6 +3,7 @@ import {
   Activity,
   BarChart3,
   Bell,
+  BookOpenCheck,
   Bot,
   Briefcase,
   Building2,
@@ -43,6 +44,8 @@ import { BrandLockup } from './components/BrandMark';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { AuthScreen, type AuthUser } from './views/AuthScreen';
 import { DashboardView, NotificationsView, TaskCenterView } from './views/DashboardAndCommand';
+import { ChairmanCommand } from './views/ChairmanCommand';
+import { AcademyView } from './views/AcademyView';
 import {
   BrandProfilesView,
   ClientsCrmView,
@@ -84,12 +87,14 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Headquarters & Command',
     items: [
+      { id: 'chairman', label: "Chairman's Office", icon: ShieldAlert },
       { id: 'hq', label: 'Company HQ', icon: Building2 },
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'workspace', label: 'My Workspace', icon: UserCheck },
       { id: 'meetings', label: 'Virtual Meetings', icon: Video },
       { id: 'tasks', label: 'Task Center', icon: CheckSquare },
       { id: 'notifications', label: 'Notifications', icon: Bell },
+      { id: 'academy', label: 'MORGAN Academy', icon: BookOpenCheck },
     ],
   },
   {
@@ -155,7 +160,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [route, setRoute] = useState('hq');
+  const [route, setRoute] = useState('chairman');
   const [activeDetail, setActiveDetail] = useState<ActiveDetail | null>(null);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -246,7 +251,7 @@ export default function App() {
         onAuthenticated={(u) => {
           setUser(u);
           setInitialized(true);
-          setRoute('hq');
+          setRoute('chairman');
           void loadOrganizationBrand();
         }}
       />
@@ -333,6 +338,10 @@ export default function App() {
     }
 
     switch (route) {
+      case 'chairman':
+        return <ChairmanCommand onNavigate={navigate} />;
+      case 'academy':
+        return <AcademyView />;
       case 'hq':
         return (
           <VirtualHqView

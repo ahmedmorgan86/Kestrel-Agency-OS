@@ -6,7 +6,7 @@ import { computeHonestIntegrationStatus, DEFAULT_ORG_ID } from '../db/seed';
 import { requireAuth, requirePermission, type AuthedRequest } from '../services/auth';
 import { generateId } from '../services/security';
 import { writeAuditLog } from '../services/audit';
-import { verifyGeminiConnection } from '../services/aiProviders';
+import { verifyGeminiConnection, verifyOllamaConnection } from '../services/aiProviders';
 import {
   isSupabaseConfigured,
   syncWorkspaceToSupabase,
@@ -46,6 +46,10 @@ distributionAndFinanceRouter.get('/integrations', requirePermission('integration
       liveStatus = 'disconnected';
       liveError = null;
     }
+    if (code === 'ollama' && liveStatus !== 'connected') {
+      liveStatus = 'not_configured';
+      liveError = 'Free local AI needs Ollama running with the selected model. Choose Verify to check availability.';
+    }
 
     return {
       ...integ,
@@ -81,6 +85,27 @@ distributionAndFinanceRouter.post(
       return;
     }
     const ts = nowIso();
+
+    if (req.params.code === 'ollama') {
+      const check = await verifyOllamaConnection();
+      const nextStatus = check.ok ? 'connected' : 'error';
+      db.prepare(
+        `UPDATE integrations SET status = ?, last_verified_at = ?, last_error = ?, updated_at = ? WHERE provider_code = ?`
+      ).run(nextStatus, check.ok ? ts : null, check.error ?? null, ts, 'ollama');
+      writeAuditLog({
+        db,
+        correlationId: req.correlationId,
+        actorType: 'human',
+        actorId: req.authUser!.id,
+        actorLabel: req.authUser!.email,
+        action: 'integration.verified',
+        entityType: 'integration',
+        entityId: String(integ.id),
+        metadata: { provider: 'ollama', ok: check.ok, model: check.model, latencyMs: check.latencyMs },
+      });
+      res.json({ status: nextStatus, model: check.model, latencyMs: check.latencyMs, error: check.error ?? null });
+      return;
+    }
 
     if (req.params.code === 'google_gemini' || req.params.code === 'gemini_image') {
       const check = await verifyGeminiConnection();
