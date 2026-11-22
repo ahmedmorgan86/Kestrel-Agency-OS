@@ -1,6 +1,6 @@
 {
-  "name": "Kestrel Agency OS",
-  "description": "Internal AI-first social media agency operating system with real SQL persistence, RBAC authentication, 14 operational AI agents, immutable approval workflows, durable background jobs, social integrations, and financial tracking.",
+  "name": "MORGAN GROUP",
+  "description": "Interactive virtual technology company with a 3D headquarters, Chairman governance, AI agents, an academy, persistent operations, and secure background processing.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
