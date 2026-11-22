@@ -18,8 +18,21 @@ import { studioAndGovRouter } from './server/routes/studioAndGov';
 import { distributionAndFinanceRouter } from './server/routes/distributionAndFinance';
 import { hqAndMeetingsRouter } from './server/routes/hqAndMeetings';
 import { academyRouter } from './server/routes/academy';
+import { assertProductionSecrets, getSecurityReadiness } from './server/services/security';
+
+function validateProductionConfiguration(): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  assertProductionSecrets();
+  if (!process.env.SQLITE_DB_PATH || !path.isAbsolute(process.env.SQLITE_DB_PATH)) {
+    throw new Error('Production startup blocked: SQLITE_DB_PATH must point to an absolute, persistent mounted volume.');
+  }
+  if (!process.env.STORAGE_ROOT_DIR || !path.isAbsolute(process.env.STORAGE_ROOT_DIR)) {
+    throw new Error('Production startup blocked: STORAGE_ROOT_DIR must point to an absolute, persistent mounted volume.');
+  }
+}
 
 export async function createAppServer() {
+  validateProductionConfiguration();
   const db = initDatabase();
   const { applied } = runMigrations(db);
   seedSystemConfiguration(db);
@@ -36,7 +49,20 @@ export async function createAppServer() {
 
   // Public health probe (no secrets exposed)
   app.get('/api/healthz', (_req, res) => {
-    res.json({ ok: true, service: 'kestrel-agency-os', ts: new Date().toISOString() });
+    try {
+      db.prepare('SELECT 1').get();
+      const readiness = getSecurityReadiness();
+      const ok = readiness.ready;
+      res.status(ok ? 200 : 503).json({
+        ok,
+        service: 'morgan-group',
+        database: 'connected',
+        readiness,
+        ts: new Date().toISOString(),
+      });
+    } catch {
+      res.status(503).json({ ok: false, service: 'morgan-group', database: 'unavailable', ts: new Date().toISOString() });
+    }
   });
 
   // Mount modular API routers

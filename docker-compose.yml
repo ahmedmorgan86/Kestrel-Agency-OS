@@ -1,0 +1,26 @@
+services:
+  morgan-group:
+    build: .
+    container_name: morgan-group
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      SQLITE_DB_PATH: /var/lib/morgan-group/data/morgan-group.sqlite
+      STORAGE_ROOT_DIR: /var/lib/morgan-group/storage
+    volumes:
+      - morgan-group-data:/var/lib/morgan-group/data
+      - morgan-group-storage:/var/lib/morgan-group/storage
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  morgan-group-data:
+  morgan-group-storage:

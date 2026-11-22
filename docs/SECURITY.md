@@ -36,6 +36,7 @@ Every state-changing endpoint enforces `requireAuth` and `requirePermission(...)
 - An in-memory sliding-window rate limiter throttles authentication and high-cost AI endpoints.
 
 ## 7. Known Security Considerations for Production Deployment
-- Replace the default ephemeral fallback `SESSION_SECRET` / `ENCRYPTION_SECRET` with high-entropy secrets managed by your secret manager (GCP Secret Manager / AWS Secrets Manager / Vault).
+- Production startup fails unless `SESSION_SECRET` and `CREDENTIAL_ENCRYPTION_KEY` are each configured with at least 32 characters. Keep them independent, stable, and in a secret manager; changing either can invalidate sessions or make stored OAuth credentials unreadable.
+- Production startup also requires absolute `SQLITE_DB_PATH` and `STORAGE_ROOT_DIR` paths. Mount both on persistent storage; deployments on ephemeral serverless filesystems are unsupported and refused by the included Docker production profile.
 - Place the application behind TLS termination and a reverse proxy / WAF for distributed rate limiting (Redis-backed) across multiple replicas.
 - Enable automated off-host encrypted backups for the database and object storage bucket.

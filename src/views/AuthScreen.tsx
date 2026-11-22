@@ -86,8 +86,8 @@ export function AuthScreen({
         </h1>
         <p className="mt-2 text-center text-sm text-slate-600 dark:text-slate-400">
           {initialized
-            ? 'Your virtual technology company, headquarters, team, and AI colleagues.'
-            : 'No administrator account exists yet. Create the initial Super Administrator account to unlock internal operations.'}
+            ? 'Sign in to your organization workspace, operational records, staff, and configured AI tools.'
+            : 'Create the first administrator account for this workspace. This securely initializes the local company database.'}
         </p>
       </div>
 
@@ -171,8 +171,8 @@ export function AuthScreen({
           </form>
 
           <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 space-y-1">
-            <p>Internal deployment only · Server-enforced RBAC · Immutable audit trail</p>
-            <p>All operational metrics, avatars, and meetings reflect real persisted state.</p>
+            <p>Private workspace · Server-enforced roles · Recorded activity</p>
+            <p>Illustrative HQ avatars and sample staff are labeled; real records are stored in the company database.</p>
           </div>
         </div>
       </div>

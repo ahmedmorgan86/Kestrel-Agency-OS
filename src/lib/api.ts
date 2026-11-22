@@ -2,7 +2,7 @@ const TOKEN_STORAGE_KEY = 'kestrel_session_token';
 
 export function getStoredToken(): string | null {
   try {
-    return sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
   } catch {
     return null;
   }
@@ -11,9 +11,9 @@ export function getStoredToken(): string | null {
 export function setStoredToken(token: string | null): void {
   try {
     if (token) {
-      sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
     } else {
-      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
     }
   } catch {
     // ignore storage errors in restricted contexts

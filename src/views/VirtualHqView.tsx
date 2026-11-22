@@ -270,7 +270,7 @@ export function VirtualHqView({
     <div className="space-y-6">
       <PageHeader
         title={`${brand.name} — Headquarters`}
-        subtitle="Real-time digital headquarters bound directly to your organization structure, human staff, 14 AI agents, task queue, and virtual meeting rooms."
+        subtitle="An operational dashboard connected to your saved organization, actual staff and work, configured AI agents, task queue, and meeting records. The sample 30-person roster and animated headquarters are illustrative only."
         actions={
           <>
             <button
@@ -301,7 +301,7 @@ export function VirtualHqView({
       {/* Top Operational Summary Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatTile label="Departments" value={counts?.totalDepartments ?? 0} meta="Active studio zones" onClick={() => setTab('directory')} />
-        <StatTile label="Virtual Team" value={counts?.virtualEmployees ?? 0} meta="Seeded fictional team" onClick={() => onNavigate('employees')} />
+        <StatTile label="Sample Roster" value={counts?.virtualEmployees ?? 0} meta="Illustrative people · not employees" onClick={() => onNavigate('employees')} />
         <StatTile
           label="AI Workforce"
           value={counts?.totalAgents ?? 0}
@@ -331,7 +331,7 @@ export function VirtualHqView({
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'lobby', label: 'Lobby Preview' },
+            { value: 'lobby', label: 'HQ Preview · illustrative' },
             { value: 'hq3d', label: 'Interactive 3D HQ' },
             { value: 'floor2d', label: '2D Floor Map' },
             { value: 'orgchart', label: 'Org Chart' },
