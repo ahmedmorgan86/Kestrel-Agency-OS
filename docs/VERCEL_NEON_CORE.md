@@ -8,6 +8,7 @@ The Vercel Node function in `api/[...path].js` serves the first operational slic
 - `GET /api/auth/status`, `POST /api/auth/bootstrap`, `POST /api/auth/login`, and `POST /api/auth/logout` provide first-admin setup and session handling.
 - `GET /api/organization` and `GET /api/hq/state` provide company metadata and the 30-person virtual staff snapshot.
 - `GET /api/academy`, `POST /api/academy/:courseId/enrollments`, and `PATCH /api/academy/enrollments/:enrollmentId` provide academy records.
+- `GET /api/dashboard` and the `/api/clients` routes provide live CRM counts and client create/read/update/archive operations.
 
 The first successful database initialization seeds 13 departments, 30 fictional employees (with reserved `.example` addresses), and 4 learning courses. It does not create a user account. The owner creates the first administrator through the app's setup form.
 
@@ -21,4 +22,4 @@ Store `DATABASE_URL` as a sensitive environment variable on the deployment branc
 
 ## Scope
 
-The existing Express/SQLite modules for clients, projects, task workers, integrations, files, finance, agent execution, and realtime events are not served by this Vercel function yet. Requests for those routes return an explicit `not_migrated` response. The current HQ snapshot includes the real seeded staff roster but does not claim that simulated employees or AI agents are executing work.
+The existing Express/SQLite modules for projects, task workers, integrations, files, finance, agent execution, and realtime events are not served by this Vercel function yet. Requests for those routes return an explicit `not_migrated` response. The current HQ snapshot includes the real seeded staff roster but does not claim that simulated employees or AI agents are executing work.
