@@ -163,6 +163,10 @@ const DEPARTMENT_ZONE_SLOTS: Record<
   finance_operations: { x: 16, z: 12, width: 9, depth: 7, color: '#ca8a04' },
 };
 
+export function getDefaultDepartmentColor(code: string): string {
+  return DEPARTMENT_ZONE_SLOTS[code]?.color ?? '#2563eb';
+}
+
 const MEETING_ROOM_SLOTS: Array<{ x: number; z: number; width: number; depth: number; color: string }> = [
   { x: -15, z: -15, width: 9, depth: 7, color: '#334155' },
   { x: 15, z: -15, width: 9, depth: 7, color: '#1e3a8a' },

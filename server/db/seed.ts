@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { getDefaultDepartmentColor } from '../../src/domain/hq';
 import { nowIso } from './database';
 import { ALL_PERMISSIONS, SYSTEM_ROLE_PERMISSIONS } from '../../src/domain/rbac';
 
@@ -9,7 +10,9 @@ const DEPARTMENTS = [
   { code: 'executive', name: 'Executive Management', description: 'Agency leadership, governance, and final escalation oversight.' },
   { code: 'strategy_research', name: 'Strategy and Research', description: 'Brand positioning, audience research, competitor monitoring, and trend intelligence.' },
   { code: 'social_media_mgmt', name: 'Social Media Management', description: 'Client account workflows, deliverables coordination, and publishing calendars.' },
+  { code: 'content_planning', name: 'Content Planning', description: 'Content calendars, campaign briefs, and editorial schedules.' },
   { code: 'content_copywriting', name: 'Content and Copywriting', description: 'Editorial concepts, hooks, captions, scripts, and platform copy variations.' },
+  { code: 'creative_direction', name: 'Creative Direction', description: 'Creative concepts, brand alignment, and production direction.' },
   { code: 'graphic_design', name: 'Graphic Design', description: 'Visual direction, art concepts, and configured image asset production.' },
   { code: 'video_production', name: 'Video Production', description: 'Reels scripts, storyboards, and configured asynchronous video pipelines.' },
   { code: 'quality_assurance', name: 'Quality Assurance', description: 'Brand voice compliance, factual verification, media dimensions, and policy checks.' },
@@ -17,6 +20,25 @@ const DEPARTMENTS = [
   { code: 'publishing_distribution', name: 'Publishing and Distribution', description: 'Approved schedule orchestration, platform publishing, and status reconciliation.' },
   { code: 'analytics_reporting', name: 'Analytics and Reporting', description: 'Platform metric synchronization, performance benchmarking, and factual reporting.' },
   { code: 'finance_operations', name: 'Finance and Operations', description: 'Revenue tracking, AI usage cost accounting, expenses, and client profitability.' },
+] as const;
+
+const MEETING_ROOMS = [
+  {
+    id: 'room_executive_boardroom', code: 'exec_boardroom', name: 'Executive Boardroom',
+    roomType: 'executive', capacity: 8, description: 'Leadership reviews and agency decisions.', colorHex: '#334155',
+  },
+  {
+    id: 'room_strategy_war_room', code: 'strategy_war_room', name: 'Strategy War Room',
+    roomType: 'department', capacity: 8, description: 'Campaign planning and strategy sessions.', colorHex: '#1e3a8a',
+  },
+  {
+    id: 'room_creative_studio', code: 'creative_studio', name: 'Creative Studio',
+    roomType: 'department', capacity: 6, description: 'Creative reviews and production planning.', colorHex: '#0f766e',
+  },
+  {
+    id: 'room_client_briefing', code: 'client_briefing', name: 'Client Briefing Room',
+    roomType: 'department', capacity: 6, description: 'Client briefings and feedback sessions.', colorHex: '#4338ca',
+  },
 ] as const;
 
 const SYSTEM_ROLES = [
@@ -375,8 +397,9 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
   `);
   for (const dept of DEPARTMENTS) {
     const id = `dept_${dept.code}`;
-    insertDept.run(id, DEFAULT_ORG_ID, dept.code, dept.name, dept.description, dept.code, dept.colorHex, ts, ts);
-    updateDeptMeta.run(dept.code, dept.colorHex, id);
+    const colorHex = getDefaultDepartmentColor(dept.code);
+    insertDept.run(id, DEFAULT_ORG_ID, dept.code, dept.name, dept.description, dept.code, colorHex, ts, ts);
+    updateDeptMeta.run(dept.code, colorHex, id);
     deptIdsByCode.set(dept.code, id);
   }
 
