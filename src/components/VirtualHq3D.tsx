@@ -58,7 +58,7 @@ interface CameraPreset {
 }
 
 const CAMERA_PRESETS: CameraPreset[] = [
-  { id: 'overview', label: 'HQ Overview', pos: [0, 29, 36], target: [0, 0, 2] },
+  { id: 'overview', label: 'HQ Overview', pos: [0, 24, 40], target: [0, 0.4, 2] },
   { id: 'reception', label: 'Reception', pos: [0, 9.5, 31], target: [0, 1.2, 20.5] },
   { id: 'executive', label: 'Executive', pos: [0, 12, -2], target: [0, 1, -15] },
   { id: 'creative', label: 'Creative Wing', pos: [-16, 13, 15], target: [-6, 0.8, 3] },
@@ -430,8 +430,8 @@ export function VirtualHq3D({
     target: THREE.Vector3;
     active: boolean;
   }>({
-    pos: new THREE.Vector3(0, 29, 36),
-    target: new THREE.Vector3(0, 0, 2),
+    pos: new THREE.Vector3(0, 24, 40),
+    target: new THREE.Vector3(0, 0.4, 2),
     active: false,
   });
 
@@ -511,12 +511,12 @@ export function VirtualHq3D({
     scene.environment = envTarget.texture;
 
     const camera = new THREE.PerspectiveCamera(42, width / height, 0.25, 220);
-    camera.position.set(0, 29, 36);
+    camera.position.set(0, 24, 40);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
-    controls.target.set(0, 0, 2);
+    controls.target.set(0, 0.4, 2);
     controls.minDistance = 8;
     controls.maxDistance = 68;
     controls.maxPolarAngle = Math.PI * 0.46;
@@ -578,6 +578,32 @@ export function VirtualHq3D({
     backWall.receiveShadow = true;
     scene.add(backWall);
 
+    // Slim architectural mullions and planted corners give the open plan a finished tech-campus feel.
+    const frameMat = new THREE.MeshStandardMaterial({ color: isDark ? 0x334155 : 0x64748b, metalness: 0.72, roughness: 0.28 });
+    for (const x of [-24.8, -12.4, 0, 12.4, 24.8]) {
+      const column = new THREE.Mesh(new THREE.BoxGeometry(0.16, 3.7, 0.22), frameMat);
+      column.position.set(x, 1.85, 27.55);
+      column.castShadow = !isSoftwareGl;
+      scene.add(column);
+    }
+    const planterMat = new THREE.MeshStandardMaterial({ color: isDark ? 0x1e293b : 0x475569, roughness: 0.72 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: isDark ? 0x16a085 : 0x238b70, roughness: 0.82 });
+    for (const [x, z] of [[-22, 24], [22, 24], [-23, -18], [23, -18]] as const) {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.58, 0.72, 12), planterMat);
+      pot.position.set(x, 0.36, z);
+      pot.castShadow = !isSoftwareGl;
+      scene.add(pot);
+      for (let leaf = 0; leaf < 5; leaf += 1) {
+        const angle = (leaf / 5) * Math.PI * 2;
+        const foliage = new THREE.Mesh(new THREE.ConeGeometry(0.24, 1.55, 7), leafMat);
+        foliage.position.set(x + Math.cos(angle) * 0.32, 1.42, z + Math.sin(angle) * 0.32);
+        foliage.rotation.z = Math.cos(angle) * -0.28;
+        foliage.rotation.x = Math.sin(angle) * 0.28;
+        foliage.castShadow = !isSoftwareGl;
+        scene.add(foliage);
+      }
+    }
+
     // Operational Wall Screens along Executive/Back Wall (clickable -> real platform modules!)
     const wallScreens: Array<{ x: number; title: string; subtitle: string; color: string; route: string }> = [
       {
@@ -590,14 +616,14 @@ export function VirtualHq3D({
       {
         x: 0,
         title: companyName.toUpperCase(),
-        subtitle: 'AI-FIRST AGENCY HEADQUARTERS',
+        subtitle: 'TECHNOLOGY · PRODUCTS · AI',
         color: primaryColor,
         route: 'company',
       },
       {
         x: 10,
-        title: 'CONTENT & PUBLISHING',
-        subtitle: 'Open Studio & Queue',
+        title: 'PRODUCT OPERATIONS',
+        subtitle: 'Teams · Systems · Delivery',
         color: '#2563eb',
         route: 'content',
       },

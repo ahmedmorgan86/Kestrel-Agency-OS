@@ -63,6 +63,7 @@ interface HqStateResponse {
     activeMeetings: number;
     workingAgents: number;
     totalHumans: number;
+    virtualEmployees: number;
     totalAgents: number;
     totalDepartments: number;
   };
@@ -300,7 +301,7 @@ export function VirtualHqView({
       {/* Top Operational Summary Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatTile label="Departments" value={counts?.totalDepartments ?? 0} meta="Active studio zones" onClick={() => setTab('directory')} />
-        <StatTile label="Human Team" value={counts?.totalHumans ?? 0} meta="Registered personnel" onClick={() => onNavigate('employees')} />
+        <StatTile label="Virtual Team" value={counts?.virtualEmployees ?? 0} meta="Seeded fictional team" onClick={() => onNavigate('employees')} />
         <StatTile
           label="AI Workforce"
           value={counts?.totalAgents ?? 0}

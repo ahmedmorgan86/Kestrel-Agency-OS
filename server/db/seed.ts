@@ -7,19 +7,19 @@ import { ALL_PERMISSIONS, SYSTEM_ROLE_PERMISSIONS } from '../../src/domain/rbac'
 export const DEFAULT_ORG_ID = 'org_kestrel_agency';
 
 const DEPARTMENTS = [
-  { code: 'executive', name: 'Executive Management', description: 'Agency leadership, governance, and final escalation oversight.' },
-  { code: 'strategy_research', name: 'Strategy and Research', description: 'Brand positioning, audience research, competitor monitoring, and trend intelligence.' },
-  { code: 'social_media_mgmt', name: 'Social Media Management', description: 'Client account workflows, deliverables coordination, and publishing calendars.' },
-  { code: 'content_planning', name: 'Content Planning', description: 'Content calendars, campaign briefs, and editorial schedules.' },
-  { code: 'content_copywriting', name: 'Content and Copywriting', description: 'Editorial concepts, hooks, captions, scripts, and platform copy variations.' },
-  { code: 'creative_direction', name: 'Creative Direction', description: 'Creative concepts, brand alignment, and production direction.' },
-  { code: 'graphic_design', name: 'Graphic Design', description: 'Visual direction, art concepts, and configured image asset production.' },
-  { code: 'video_production', name: 'Video Production', description: 'Reels scripts, storyboards, and configured asynchronous video pipelines.' },
-  { code: 'quality_assurance', name: 'Quality Assurance', description: 'Brand voice compliance, factual verification, media dimensions, and policy checks.' },
-  { code: 'client_success', name: 'Client Success', description: 'Client updates, feedback synthesis, meeting summaries, and approval follow-up.' },
-  { code: 'publishing_distribution', name: 'Publishing and Distribution', description: 'Approved schedule orchestration, platform publishing, and status reconciliation.' },
-  { code: 'analytics_reporting', name: 'Analytics and Reporting', description: 'Platform metric synchronization, performance benchmarking, and factual reporting.' },
-  { code: 'finance_operations', name: 'Finance and Operations', description: 'Revenue tracking, AI usage cost accounting, expenses, and client profitability.' },
+  { code: 'executive', name: 'Executive Leadership', description: 'Company leadership, governance, and decision oversight.' },
+  { code: 'strategy_research', name: 'Research and Intelligence', description: 'Technology research, market intelligence, and strategic planning.' },
+  { code: 'social_media_mgmt', name: 'Digital Products and Platforms', description: 'Digital product delivery, platform engineering, and service operations.' },
+  { code: 'content_planning', name: 'Product Management', description: 'Product strategy, roadmaps, discovery, and delivery.' },
+  { code: 'content_copywriting', name: 'Product Writing and Documentation', description: 'Product language, technical documentation, and knowledge systems.' },
+  { code: 'creative_direction', name: 'Experience Design', description: 'Human centered product design and interaction systems.' },
+  { code: 'graphic_design', name: 'Visual and Brand Design', description: 'Visual systems, product interfaces, and company identity.' },
+  { code: 'video_production', name: 'Media and Prototyping Lab', description: 'Interactive prototypes, demos, and product storytelling.' },
+  { code: 'quality_assurance', name: 'Quality Engineering', description: 'Software quality, validation, reliability, and release readiness.' },
+  { code: 'client_success', name: 'Customer Success', description: 'Customer outcomes, product enablement, and support operations.' },
+  { code: 'publishing_distribution', name: 'Launch and Communications', description: 'Product launches, company communications, and distribution.' },
+  { code: 'analytics_reporting', name: 'Data and Analytics', description: 'Data products, business intelligence, and measurement.' },
+  { code: 'finance_operations', name: 'Finance and Business Operations', description: 'Financial planning, business operations, and governance.' },
 ] as const;
 
 // These are intentionally fictional, login-free employees for the virtual company simulation.
@@ -29,32 +29,32 @@ const VIRTUAL_EMPLOYEES: Array<{ name: string; department: string; title: string
   { name: 'Jordan Lee', department: 'executive', title: 'Chief Technology Officer' },
   { name: 'Morgan Ellis', department: 'executive', title: 'Chief Operating Officer' },
   { name: 'Riley Chen', department: 'executive', title: 'Executive Assistant' },
-  { name: 'Samira Haddad', department: 'strategy_research', title: 'Director of Strategy' },
-  { name: 'Ethan Cole', department: 'strategy_research', title: 'Market Research Analyst' },
-  { name: 'Maya Patel', department: 'strategy_research', title: 'Audience Insights Analyst' },
-  { name: 'Noah Bennett', department: 'social_media_mgmt', title: 'Social Media Director' },
-  { name: 'Layla Hassan', department: 'social_media_mgmt', title: 'Social Media Manager' },
-  { name: 'Theo Martin', department: 'social_media_mgmt', title: 'Community Manager' },
-  { name: 'Grace Kim', department: 'content_planning', title: 'Content Planning Lead' },
-  { name: 'Omar Farouk', department: 'content_planning', title: 'Editorial Planner' },
-  { name: 'Zoe Ramirez', department: 'content_copywriting', title: 'Copywriting Lead' },
-  { name: 'Adam Wilson', department: 'content_copywriting', title: 'Senior Copywriter' },
-  { name: 'Nadia Saleh', department: 'content_copywriting', title: 'Scriptwriter' },
-  { name: 'Luca Moretti', department: 'creative_direction', title: 'Creative Director' },
-  { name: 'Amira Nasser', department: 'creative_direction', title: 'Art Director' },
-  { name: 'Leo Fischer', department: 'graphic_design', title: 'Design Lead' },
-  { name: 'Hana Youssef', department: 'graphic_design', title: 'Brand Designer' },
-  { name: 'Milo Turner', department: 'graphic_design', title: 'Motion Designer' },
-  { name: 'Sofia Cruz', department: 'video_production', title: 'Video Production Lead' },
-  { name: 'Karim Adel', department: 'video_production', title: 'Video Editor' },
-  { name: 'Ella Scott', department: 'quality_assurance', title: 'Quality Lead' },
-  { name: 'Yusuf Mansour', department: 'quality_assurance', title: 'Content Reviewer' },
-  { name: 'Isla Morgan', department: 'client_success', title: 'Client Success Lead' },
-  { name: 'Daniel Park', department: 'client_success', title: 'Client Partner' },
-  { name: 'Mariam Khalil', department: 'publishing_distribution', title: 'Publishing Lead' },
-  { name: 'Alex Rivera', department: 'publishing_distribution', title: 'Distribution Coordinator' },
-  { name: 'Priya Shah', department: 'analytics_reporting', title: 'Analytics Lead' },
-  { name: 'Owen Brooks', department: 'finance_operations', title: 'Finance & Operations Lead' },
+  { name: 'Samira Haddad', department: 'strategy_research', title: 'Director of Technology Strategy' },
+  { name: 'Ethan Cole', department: 'strategy_research', title: 'Technology Research Analyst' },
+  { name: 'Maya Patel', department: 'strategy_research', title: 'AI and Market Intelligence Analyst' },
+  { name: 'Noah Bennett', department: 'social_media_mgmt', title: 'Director of Digital Platforms' },
+  { name: 'Layla Hassan', department: 'social_media_mgmt', title: 'Platform Operations Manager' },
+  { name: 'Theo Martin', department: 'social_media_mgmt', title: 'Cloud Services Engineer' },
+  { name: 'Grace Kim', department: 'content_planning', title: 'Director of Product' },
+  { name: 'Omar Farouk', department: 'content_planning', title: 'Product Manager' },
+  { name: 'Zoe Ramirez', department: 'content_copywriting', title: 'Technical Documentation Lead' },
+  { name: 'Adam Wilson', department: 'content_copywriting', title: 'Senior Technical Writer' },
+  { name: 'Nadia Saleh', department: 'content_copywriting', title: 'Knowledge Systems Specialist' },
+  { name: 'Luca Moretti', department: 'creative_direction', title: 'Director of Experience Design' },
+  { name: 'Amira Nasser', department: 'creative_direction', title: 'Product Experience Designer' },
+  { name: 'Leo Fischer', department: 'graphic_design', title: 'Design Systems Lead' },
+  { name: 'Hana Youssef', department: 'graphic_design', title: 'Product Interface Designer' },
+  { name: 'Milo Turner', department: 'graphic_design', title: 'Visual Systems Designer' },
+  { name: 'Sofia Cruz', department: 'video_production', title: 'Prototyping Lab Lead' },
+  { name: 'Karim Adel', department: 'video_production', title: 'Interactive Prototype Engineer' },
+  { name: 'Ella Scott', department: 'quality_assurance', title: 'Director of Quality Engineering' },
+  { name: 'Yusuf Mansour', department: 'quality_assurance', title: 'Software Test Engineer' },
+  { name: 'Isla Morgan', department: 'client_success', title: 'Customer Success Lead' },
+  { name: 'Daniel Park', department: 'client_success', title: 'Technical Customer Partner' },
+  { name: 'Mariam Khalil', department: 'publishing_distribution', title: 'Product Launch Lead' },
+  { name: 'Alex Rivera', department: 'publishing_distribution', title: 'Developer Communications Manager' },
+  { name: 'Priya Shah', department: 'analytics_reporting', title: 'Director of Data and Analytics' },
+  { name: 'Owen Brooks', department: 'finance_operations', title: 'Finance and Business Operations Lead' },
 ];
 
 const ACADEMY_COURSES = [
@@ -114,8 +114,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Executive Management',
     roleDescription: 'Breaks operational requests into structured tasks, tracks dependencies, monitors deadlines, identifies failures, and escalates consequential decisions to human managers.',
     systemInstructions: 'You are the AI Operations Manager for an internal social media agency. Decompose operational requests into concrete, dependency-ordered tasks assigned to the appropriate specialist agents. Identify missing prerequisites and explicitly flag any action requiring human approval. Never approve your own high-risk actions and never fabricate completion evidence. Return strictly valid JSON.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_project_context', 'create_task_plan', 'escalate_to_human'],
     qualityRequirements: 'Every task must define owner agent, clear deliverable criteria, dependencies, and explicit approval gate flags.',
   },
@@ -127,8 +127,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Head of Strategy and Research',
     roleDescription: 'Researches client industries, target audiences, competitors, and grounded real-world trends with verifiable source URLs and observation dates.',
     systemInstructions: 'You are the Research Agent. Use grounded web search results strictly to report real-world industry trends, competitor observations, and audience insights. Record exact source URLs returned by search grounding and distinguish verified facts from AI interpretation. Never invent URLs, dates, or unsupported claims.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['google_search_grounding', 'read_brand_profile', 'record_research_report'],
     qualityRequirements: 'All factual claims must cite real grounded source URLs or be explicitly labeled as AI interpretation/unverified.',
   },
@@ -140,8 +140,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Head of Strategy and Research',
     roleDescription: 'Develops social media strategies, content pillars, platform recommendations, audience positioning, and measurable strategic briefs.',
     systemInstructions: 'You are the Strategy Agent. Using the approved client brand profile and research findings, formulate a grounded social media strategy with clear content pillars, platform rationale, audience positioning, and measurable KPIs. Do not fabricate historical client metrics. Return strictly valid JSON.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_brand_profile', 'read_research_reports', 'draft_strategy_brief'],
     qualityRequirements: 'Must align strictly with approved brand positioning and distinguish hypotheses from measured metrics.',
   },
@@ -153,8 +153,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Account Manager',
     roleDescription: 'Coordinates client production workflows, monitors content deadlines, maintains publishing calendars, and identifies missing deliverables.',
     systemInstructions: 'You are the Social Media Manager Agent. Audit client project deliverables, identify bottlenecks or missing media/approvals, and organize weekly production schedules respecting platform cadence and approval lead times. Return strictly valid JSON.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_client_workflow', 'audit_calendar_gaps', 'propose_schedule'],
     qualityRequirements: 'Highlight overdue items and missing approvals clearly without altering approved content.',
   },
@@ -166,8 +166,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Social Media Manager',
     roleDescription: 'Generates non-repetitive content ideas organized by content pillar and builds monthly platform-specific content calendars.',
     systemInstructions: 'You are the Content Planner Agent. Generate distinct, brand-aligned content concepts mapped to content pillars, formats, and target platforms. Respect prohibited brand expressions and avoid repeating recent topics. Return strictly valid JSON.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_brand_profile', 'read_recent_content', 'draft_content_calendar'],
     qualityRequirements: 'Each idea must specify pillar, platform, format, hook angle, and required media assets.',
   },
@@ -179,8 +179,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Creative Lead',
     roleDescription: 'Writes platform-specific captions, hooks, short-form video scripts, calls to action, and hashtag sets aligned to the approved brand voice.',
     systemInstructions: 'You are the Copywriter Agent. Always follow the exact approved Brand Profile tone of voice, preferred language, dialect, preferred expressions, and strictly avoid every prohibited expression. Produce platform-tailored copy with strong hooks, clear CTAs, and relevant hashtags. Return strictly valid JSON.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_brand_profile', 'read_content_brief', 'draft_content_version'],
     qualityRequirements: 'Zero prohibited expressions; platform length compliance; explicit hook, body, CTA, and script when video.',
   },
@@ -192,8 +192,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Creative Lead',
     roleDescription: 'Translates strategic briefs into creative visual concepts, art direction notes, and detailed image-generation briefs aligned with brand identity.',
     systemInstructions: 'You are the Creative Director Agent. Convert content briefs and approved brand visual guidelines (color palette, typography, visual references) into concrete art direction briefs, framing instructions, and image/video prompts. Return strictly valid JSON.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_brand_profile', 'read_content_brief', 'create_creative_brief'],
     qualityRequirements: 'Visual specifications must explicitly reference brand palette, composition, aspect ratio, and platform safe zones.',
   },
@@ -205,8 +205,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Creative Director',
     roleDescription: 'Prepares image prompts and invokes configured image-generation providers to produce and store real visual assets with cost tracking.',
     systemInstructions: 'You are the Image Generation Agent. Produce precise visual prompts aligned to the Creative Direction brief and invoke only configured image generation adapters. If no image generation provider is configured or authorized, report the capability as unavailable—never fabricate a placeholder image.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_creative_brief', 'invoke_image_provider', 'store_asset_metadata'],
     qualityRequirements: 'Output must validate MIME type, dimensions, SHA-256 checksum, and actual provider cost.',
   },
@@ -218,8 +218,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Creative Lead',
     roleDescription: 'Produces Reels/TikTok/Shorts scripts, shot-by-shot storyboards, and manages asynchronous video-generation provider jobs when configured.',
     systemInstructions: 'You are the Video Production Agent. Produce structured shot-by-shot storyboards, voiceover scripts, on-screen text timings, and audio cues. Only dispatch video rendering jobs to a configured video provider; if no video provider is configured, explicitly report rendering as unavailable rather than simulating a video file.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_brand_profile', 'draft_storyboard', 'invoke_video_provider'],
     qualityRequirements: 'Every storyboard must include scene timings, visual framing, audio/caption sync, and aspect ratio specs.',
   },
@@ -231,8 +231,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Quality Assurance Lead',
     roleDescription: 'Audits copy for spelling, unsupported factual claims, brand voice compliance, prohibited expressions, platform rules, and missing media.',
     systemInstructions: 'You are the Quality Assurance Agent. Critically inspect the content item against the approved Brand Profile and platform requirements. Check spelling, prohibited terms, factual claims without evidence, CTA clarity, hashtag limits, and missing media assets. Return a structured pass/fail QA review JSON with specific actionable issues. You cannot grant final human publishing approval.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_brand_profile', 'read_content_version', 'record_qa_review'],
     qualityRequirements: 'Structured checklist covering brand voice, prohibited words, factual risk, platform constraints, and asset completeness.',
   },
@@ -244,8 +244,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Operations Director',
     roleDescription: 'Validates human approval hashes, connected social accounts, and media specs prior to scheduling; monitors outcomes and escalates failures.',
     systemInstructions: 'You are the Publishing Coordinator Agent. Verify that a valid human approval matches the exact content version hash and that the destination social account is connected with valid permissions. Never bypass approval gates and never mark an item published without external post ID evidence.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['verify_approval_hash', 'validate_social_account', 'prepare_publishing_job'],
     qualityRequirements: '100% enforcement of human approval verification and idempotency key validation.',
   },
@@ -257,8 +257,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Head of Analytics',
     roleDescription: 'Analyzes real synced platform metrics, compares periods, identifies content patterns, and separates measured facts from interpretations.',
     systemInstructions: 'You are the Analytics Agent. Analyze ONLY the real persisted platform metrics supplied in the task context. Never invent engagement numbers, impressions, or follower counts. If metrics are empty or unavailable, state explicitly what data is missing and which platform integration needs synchronization. Clearly separate measured facts from hypotheses.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_synced_metrics', 'generate_performance_report'],
     qualityRequirements: 'Every numeric figure must map directly to a persisted platform metric record.',
   },
@@ -270,8 +270,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Account Manager',
     roleDescription: 'Prepares client status updates, synthesizes client feedback, tracks pending approvals, and escalates account risks.',
     systemInstructions: 'You are the Client Success Agent. Draft accurate, professional client status summaries derived strictly from real project tasks, content statuses, and pending approval queues. Never promise unverified dates or fabricate completed work. Return strictly valid JSON.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_client_status', 'draft_client_update', 'escalate_client_risk'],
     qualityRequirements: 'Accurate reflection of actual database statuses and pending human reviews.',
   },
@@ -283,8 +283,8 @@ const AGENT_SEEDS: AgentSeed[] = [
     supervisorName: 'Finance Director',
     roleDescription: 'Analyzes recorded revenue, AI usage costs, project expenses, and client profitability without ever inventing financial figures or executing payments.',
     systemInstructions: 'You are the Finance Agent. Analyze ONLY the actual recorded invoices, payments, expenses, and AI usage cost records supplied in context. Strictly separate actual expenses from estimates. Never invent financial values and never execute financial transactions. Return strictly valid JSON.',
-    modelProvider: 'google_gemini',
-    modelIdentifier: 'gemini-4-hydrogen',
+    modelProvider: 'ollama',
+    modelIdentifier: 'qwen3.5:4b',
     allowedTools: ['read_financial_ledger', 'prepare_profitability_brief'],
     qualityRequirements: '100% arithmetic fidelity to recorded ledger entries; clear actual vs estimate distinction.',
   },
@@ -302,13 +302,22 @@ interface IntegrationSeed {
 
 const INTEGRATION_SEEDS: IntegrationSeed[] = [
   {
+    providerCode: 'ollama',
+    displayName: 'Ollama Local AI (Free)',
+    category: 'ai_text',
+    requiredEnvVars: [],
+    requiredScopes: [],
+    capabilities: { textGeneration: true, structuredJson: true, localInference: true },
+    limitationsNote: 'Runs a downloaded open model on your own computer or server with no API usage fees. Install Ollama and the configured model; results are ungrounded unless separate search is added.',
+  },
+  {
     providerCode: 'google_gemini',
     displayName: 'Google Gemini AI (Text & Grounded Research)',
     category: 'ai_text',
     requiredEnvVars: ['GEMINI_API_KEY'],
     requiredScopes: [],
     capabilities: { textGeneration: true, structuredJson: true, googleSearchGrounding: true },
-    limitationsNote: 'Server-side SDK (@google/genai) using free-tier-compatible models (gemini-4-hydrogen, gemini-3.1-flash-lite). Uses your GEMINI_API_KEY from Settings > Secrets.',
+    limitationsNote: 'Optional Google AI Studio API free tier, subject to account/model quotas and terms. A Gemini API key is required; the company default uses local Ollama instead.',
   },
   {
     providerCode: 'gemini_image',
@@ -452,6 +461,12 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
     deptIdsByCode.set(dept.code, id);
   }
 
+  // Refresh only the fictional seeded roster; never overwrite real employee records.
+  const updateVirtualEmployee = db.prepare(`
+    UPDATE employees SET department_id = ?, job_title = ?, updated_at = ?
+    WHERE id = ? AND email LIKE '%@morgangroup.example'
+  `);
+
   // 2a. Thirty fictional staff members for the interactive company simulation.
   const virtualCeosId = 'employee_virtual_01';
   const insertVirtualEmployee = db.prepare(`
@@ -478,6 +493,7 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
       ts,
       ts
     );
+    updateVirtualEmployee.run(departmentId, employee.title, ts, employeeId);
     if (index === 0 || VIRTUAL_EMPLOYEES[index - 1]?.department !== employee.department) {
       db.prepare('UPDATE departments SET lead_employee_id = COALESCE(lead_employee_id, ?) WHERE id = ?')
         .run(employeeId, departmentId);
@@ -623,12 +639,6 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
       );
     }
   }
-
-  // Ensure existing installations migrate image_generation_agent to free-tier-compatible default
-  db.prepare(
-    `UPDATE agents SET model_identifier = 'gemini-4-hydrogen', updated_at = ?
-     WHERE code = 'image_generation_agent' AND model_identifier = 'gemini-3.1-flash-lite-image'`
-  ).run(ts);
 
   // 5. Integrations — honest environment-derived status
   const upsertIntegration = db.prepare(`

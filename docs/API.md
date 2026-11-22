@@ -24,7 +24,7 @@ All endpoints are mounted under `/api`. Authenticated routes accept either the `
 - `GET /api/agents` — List the 14 operational AI agents with active model, temperature, status, and run counts.
 - `GET /api/agents/:id` — Detailed agent profile, prompt versions, allowed tools, policies, and recent runs.
 - `PATCH /api/agents/:id` — Update agent model, system prompt (creates new immutable `ai_agent_versions` record), temperature, token budget, or status.
-- `POST /api/agents/:id/run` — Enqueues a real durable `agent_task_execution` background job using server-side `@google/genai`.
+- `POST /api/agents/:id/run` — Enqueues a durable `agent_task_execution` background job using the agent's configured server-side model (local Ollama by default; optional Gemini cloud).
 
 ## MORGAN Academy
 - `GET /api/academy` — Returns the learning catalog, active virtual team, and saved enrollment progress.

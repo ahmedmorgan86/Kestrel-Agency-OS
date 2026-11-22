@@ -19,6 +19,8 @@ test('database migrations, honest system config seed, auth bootstrap, credential
   assert.ok(applied.includes('001_initial_agency_os_schema'));
   assert.ok(applied.includes('003_morgan_academy'));
   assert.ok(applied.includes('004_morgan_group_identity'));
+  assert.ok(applied.includes('005_morgan_technology_company_departments'));
+  assert.ok(applied.includes('006_free_local_ai_defaults'));
 
   // Seed is idempotent, and the virtual workforce is clearly separate from client and activity data.
   seedSystemConfiguration(db);
@@ -40,6 +42,8 @@ test('database migrations, honest system config seed, auth bootstrap, credential
   assert.equal(deptCount, 13);
   assert.equal(meetingRoomCount, 4);
   assert.equal(agentCount, 14);
+  const localAgentCount = (db.prepare("SELECT COUNT(*) as c FROM agents WHERE model_provider = 'ollama' AND model_identifier = 'qwen3.5:4b'").get() as { c: number }).c;
+  assert.equal(localAgentCount, 14, 'The AI workforce uses the free local model by default');
   assert.equal(employeeCount, 30, 'The virtual company starts with 30 fictional, login-free employees');
   assert.equal(courseCount, 4, 'The academy catalog is seeded with its learning paths');
   assert.equal(enrollmentCount, 0, 'No learning completions or enrollments are fabricated');
@@ -64,6 +68,8 @@ test('database migrations, honest system config seed, auth bootstrap, credential
   assert.equal(clientCount, 0, 'Production seed must contain zero fabricated clients');
   assert.equal(runCount, 0, 'Production seed must contain zero fabricated agent executions');
   assert.ok(supaInteg, 'Supabase integration must be seeded');
+  assert.ok(db.prepare("SELECT id FROM integrations WHERE provider_code = 'ollama'").get(), 'Ollama local provider must be available without an API key');
+  assert.equal((db.prepare("SELECT name FROM departments WHERE code = 'quality_assurance'").get() as { name: string }).name, 'Quality Engineering');
 
   const prevUrl = process.env.SUPABASE_URL;
   const prevKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

@@ -1430,8 +1430,8 @@ hqAndMeetingsRouter.post('/meetings/:id/orchestrate', requireAuth, async (req: A
 
     try {
       const result = await generateStructuredText({
-        provider: String(agent.model_provider || 'google_gemini'),
-        model: String(agent.model_identifier || 'gemini-4-hydrogen'),
+        provider: String(agent.model_provider || 'ollama'),
+        model: String(agent.model_identifier || 'qwen3.5:4b'),
         systemInstruction: String(agent.system_instructions),
         prompt,
         expectJson: true,
@@ -1525,11 +1525,11 @@ hqAndMeetingsRouter.post('/meetings/:id/orchestrate', requireAuth, async (req: A
   // Synthesize Coordinator Summary via real Gemini call
   try {
     const coordResult = await generateStructuredText({
-      provider: 'google_gemini',
-      model: 'gemini-4-hydrogen',
+      provider: 'ollama',
+      model: 'qwen3.5:4b',
       systemInstruction:
-        'You are the Agency Meeting Coordinator. Summarize the real discussion objectively: key alignment points, explicit disagreements/risks, and recommended human decisions. Never fabricate facts.',
-      prompt: `Summarize this agency meeting transcript for "${String(meeting.title)}":\n\n${transcriptLines.join('\n')}`,
+        'You are the MORGAN GROUP Meeting Coordinator. Summarize the real discussion objectively: key alignment points, explicit disagreements/risks, and recommended human decisions. Never fabricate facts.',
+      prompt: `Summarize this company meeting transcript for "${String(meeting.title)}":\n\n${transcriptLines.join('\n')}`,
       expectJson: false,
       timeoutSeconds: 45,
     });

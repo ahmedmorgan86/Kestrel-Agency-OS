@@ -118,8 +118,8 @@ export const MIGRATIONS: Migration[] = [
         supervisor_name TEXT NOT NULL DEFAULT 'Executive Management',
         system_instructions TEXT NOT NULL,
         prompt_version INTEGER NOT NULL DEFAULT 1,
-        model_provider TEXT NOT NULL DEFAULT 'google_gemini',
-        model_identifier TEXT NOT NULL DEFAULT 'gemini-4-hydrogen',
+        model_provider TEXT NOT NULL DEFAULT 'ollama',
+        model_identifier TEXT NOT NULL DEFAULT 'qwen3.5:4b',
         allowed_tools_json TEXT NOT NULL DEFAULT '[]',
         permission_policies_json TEXT NOT NULL DEFAULT '{}',
         monthly_budget_usd REAL NOT NULL DEFAULT 50.0 CHECK (monthly_budget_usd >= 0),
@@ -889,6 +889,58 @@ export const MIGRATIONS: Migration[] = [
       WHERE id = 'org_kestrel_agency';
     `,
   },
+  {
+    version: '005',
+    name: 'morgan_technology_company_departments',
+    sql: `
+      UPDATE departments SET name = CASE code
+        WHEN 'executive' THEN 'Executive Leadership'
+        WHEN 'strategy_research' THEN 'Research and Intelligence'
+        WHEN 'social_media_mgmt' THEN 'Digital Products and Platforms'
+        WHEN 'content_planning' THEN 'Product Management'
+        WHEN 'content_copywriting' THEN 'Product Writing and Documentation'
+        WHEN 'creative_direction' THEN 'Experience Design'
+        WHEN 'graphic_design' THEN 'Visual and Brand Design'
+        WHEN 'video_production' THEN 'Media and Prototyping Lab'
+        WHEN 'quality_assurance' THEN 'Quality Engineering'
+        WHEN 'client_success' THEN 'Customer Success'
+        WHEN 'publishing_distribution' THEN 'Launch and Communications'
+        WHEN 'analytics_reporting' THEN 'Data and Analytics'
+        WHEN 'finance_operations' THEN 'Finance and Business Operations'
+        ELSE name END,
+        description = CASE code
+        WHEN 'executive' THEN 'Company leadership, governance, and decision oversight.'
+        WHEN 'strategy_research' THEN 'Technology research, market intelligence, and strategic planning.'
+        WHEN 'social_media_mgmt' THEN 'Digital product delivery, platform engineering, and service operations.'
+        WHEN 'content_planning' THEN 'Product strategy, roadmaps, discovery, and delivery.'
+        WHEN 'content_copywriting' THEN 'Product language, technical documentation, and knowledge systems.'
+        WHEN 'creative_direction' THEN 'Human centered product design and interaction systems.'
+        WHEN 'graphic_design' THEN 'Visual systems, product interfaces, and company identity.'
+        WHEN 'video_production' THEN 'Interactive prototypes, demos, and product storytelling.'
+        WHEN 'quality_assurance' THEN 'Software quality, validation, reliability, and release readiness.'
+        WHEN 'client_success' THEN 'Customer outcomes, product enablement, and support operations.'
+        WHEN 'publishing_distribution' THEN 'Product launches, company communications, and distribution.'
+        WHEN 'analytics_reporting' THEN 'Data products, business intelligence, and measurement.'
+        WHEN 'finance_operations' THEN 'Financial planning, business operations, and governance.'
+        ELSE description END,
+        updated_at = ?
+      WHERE organization_id = 'org_kestrel_agency'
+        AND code IN ('executive','strategy_research','social_media_mgmt','content_planning','content_copywriting','creative_direction','graphic_design','video_production','quality_assurance','client_success','publishing_distribution','analytics_reporting','finance_operations')
+        AND name IN ('Executive Management','Strategy and Research','Social Media Management','Content Planning','Content and Copywriting','Creative Direction','Graphic Design','Video Production','Quality Assurance','Client Success','Publishing and Distribution','Analytics and Reporting','Finance and Operations');
+    `,
+  },
+  {
+    version: '006',
+    name: 'free_local_ai_defaults',
+    sql: `
+      UPDATE agents SET model_provider = 'ollama', model_identifier = 'qwen3.5:4b', updated_at = datetime('now')
+      WHERE code IN ('ai_operations_manager','research_agent','strategy_agent','social_media_manager_agent','content_planner_agent','copywriter_agent','creative_director_agent','image_generation_agent','video_production_agent','quality_assurance_agent','publishing_coordinator_agent','analytics_agent','client_success_agent','finance_agent')
+        AND model_provider = 'google_gemini' AND model_identifier IN ('gemini-4-hydrogen','gemini-3.1-flash-lite-image');
+      UPDATE agent_versions SET model_provider = 'ollama', model_identifier = 'qwen3.5:4b'
+      WHERE model_provider = 'google_gemini' AND model_identifier IN ('gemini-4-hydrogen','gemini-3.1-flash-lite-image')
+        AND agent_id IN (SELECT id FROM agents WHERE code IN ('ai_operations_manager','research_agent','strategy_agent','social_media_manager_agent','content_planner_agent','copywriter_agent','creative_director_agent','image_generation_agent','video_production_agent','quality_assurance_agent','publishing_coordinator_agent','analytics_agent','client_success_agent','finance_agent'));
+    `,
+  },
 ];
 
 function ensureColumn(db: DatabaseSync, table: string, column: string, definition: string): void {
@@ -941,8 +993,10 @@ export function runMigrations(db: DatabaseSync): { applied: string[] } {
     if (appliedSet.has(migration.version)) continue;
     db.exec('BEGIN IMMEDIATE');
     try {
-      if (migration.version === '004') {
+      if (migration.version === '004' || migration.version === '005') {
         db.prepare(migration.sql).run(nowIso());
+      } else if (migration.version === '006') {
+        db.exec(migration.sql);
       } else {
         db.exec(migration.sql);
       }
