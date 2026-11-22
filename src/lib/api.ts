@@ -1,8 +1,10 @@
 const TOKEN_STORAGE_KEY = 'kestrel_session_token';
+const API_UNAVAILABLE_MESSAGE =
+  'بيانات الشركة غير مهيأة على هذا النشر بعد. لا توجد قاعدة بيانات تشغيلية مرتبطة بهذا الموقع.';
 
 export function getStoredToken(): string | null {
   try {
-    return localStorage.getItem(TOKEN_STORAGE_KEY);
+    return sessionStorage.getItem(TOKEN_STORAGE_KEY);
   } catch {
     return null;
   }
@@ -11,9 +13,9 @@ export function getStoredToken(): string | null {
 export function setStoredToken(token: string | null): void {
   try {
     if (token) {
-      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
     } else {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
     }
   } catch {
     // ignore storage errors in restricted contexts
@@ -45,7 +47,9 @@ export async function apiRequest<T = unknown>(
     headers['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(`/api${path}`, {
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
     method: options.method ?? 'GET',
     headers,
     credentials: 'include',
@@ -55,7 +59,10 @@ export async function apiRequest<T = unknown>(
         : options.isFormData
         ? (options.body as FormData)
         : JSON.stringify(options.body),
-  });
+    });
+  } catch {
+    throw new ApiError(503, API_UNAVAILABLE_MESSAGE);
+  }
 
   const contentType = response.headers.get('content-type') || '';
   const data = contentType.includes('application/json')
@@ -63,6 +70,9 @@ export async function apiRequest<T = unknown>(
     : { error: await response.text() };
 
   if (!response.ok) {
+    if (response.status === 404 && path === '/auth/status') {
+      throw new ApiError(503, API_UNAVAILABLE_MESSAGE);
+    }
     throw new ApiError(
       response.status,
       (data as { error?: string })?.error || `Request failed with status ${response.status}`
