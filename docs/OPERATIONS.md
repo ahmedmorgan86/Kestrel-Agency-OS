@@ -4,10 +4,10 @@
 Copy `.env.example` to `.env` (or configure secrets in your hosting platform):
 - `APP_URL` — Public base URL (used for OAuth redirect callbacks).
 - `PORT` — HTTP bind port (default `3000`).
-- `DATABASE_PATH` — Path to SQLite file (default `./data/kestrel-agency.sqlite`).
-- `STORAGE_DIR` — Local blob directory (default `./data/storage`).
-- `SESSION_SECRET` — 32+ byte secret for HMAC session digests and signed URLs.
-- `ENCRYPTION_SECRET` — 32+ byte secret for AES-256-GCM encryption of OAuth tokens.
+- `SQLITE_DB_PATH` — Path to the SQLite file (default `./data/kestrel-agency.sqlite`).
+- `STORAGE_ROOT_DIR` — Local blob directory (default `./data/storage`).
+- `SESSION_SECRET` — Required in production; random secret with at least 32 characters for session digests and signed URLs.
+- `CREDENTIAL_ENCRYPTION_KEY` — Required in production; independent random secret with at least 32 characters for OAuth token encryption.
 - `OLLAMA_BASE_URL` — Local Ollama endpoint (defaults to `http://127.0.0.1:11434`).
 - `OLLAMA_MODEL` — Locally installed model (defaults to `qwen3.5:4b`).
 - Optional `GEMINI_API_KEY` — Google AI Studio cloud free tier; separate key, quotas, and provider terms apply.
@@ -21,6 +21,24 @@ npm run lint          # TypeScript static typecheck (tsc --noEmit)
 npm run build         # Production Vite bundle (dist/)
 npm run start         # Runs Express server + background worker on port 3000
 ```
+
+### First run and owner account
+1. Set a strong, private `SESSION_SECRET` and a separate `CREDENTIAL_ENCRYPTION_KEY` in `.env`. On PowerShell, generate each with `[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`.
+2. Start the app with `npm run dev` for local development, or use `docker compose up -d --build` for a persistent container installation.
+3. Open `http://localhost:3000`. On a new database, enter the owner's name, your email, and a new password in **Create Administrator & Continue**. This creates the sole initial super-admin; the first-run action is locked after initialization.
+4. Do not reuse passwords shared in chats or other sites. If a password was previously sent in a chat, change it before using it here.
+5. Use `http://localhost:3000/api/healthz` to check the service and database. Create employees, client records, and work items in the app; the built-in 30-person fictional roster is visual sample data, not real employees.
+
+### Persistent install with Docker Compose
+The Compose setup stores the SQLite database and uploaded assets in separate named volumes and configures a health check. Back them up together before upgrades:
+
+```bash
+docker compose exec -T morgan-group node -e "const {DatabaseSync}=require('node:sqlite'); const db=new DatabaseSync(process.env.SQLITE_DB_PATH); db.exec(\"VACUUM INTO '/var/lib/morgan-group/data/backup.sqlite'\"); db.close()"
+docker compose cp morgan-group:/var/lib/morgan-group/data/backup.sqlite ./backup.sqlite
+docker compose cp morgan-group:/var/lib/morgan-group/storage ./storage-backup
+```
+
+For public deployment, use a persistent-volume host and TLS termination. Never deploy this SQLite/local-storage configuration to ephemeral serverless storage. Production startup fails closed unless both cryptographic keys and absolute persistent paths are configured. Keep `OLLAMA_BASE_URL` private to the application host; use private networking or a VPN for remote Ollama.
 
 ## 3. Durable Background Worker Operations
 - The worker polls `background_jobs` every 2 seconds and claims due jobs with a lease (`lease_expires_at`).
@@ -36,8 +54,8 @@ npm run start         # Runs Express server + background worker on port 3000
 ## 5. Honest Production Readiness Checklist
 | Capability | Current Status | Notes |
 | --- | --- | --- |
-| Persistent Relational Storage & Migrations | Ready (Local SQLite) / Migration Script Provided (Postgres) | WAL mode + FK enforcement active; Postgres DDL included for clustered deployment |
-| Auth, Scrypt Hashing, RBAC & Audit Logs | Ready | First-run super admin bootstrap, 5 roles, 31 permissions |
+| Persistent Relational Storage & Migrations | Ready for a single persistent server | SQLite WAL + foreign keys; Compose uses persistent named volumes. PostgreSQL DDL is a migration reference and is not the runtime database adapter. |
+| Auth, Scrypt Hashing, RBAC & Audit Logs | Ready for private single-server operation | First-run super admin bootstrap, 5 roles, 31 permissions; production refuses ephemeral cryptographic secrets |
 | 14-State Content Workflow & Immutable Approvals | Ready | SHA-256 version locking, auto-invalidation on edit, human-only decisions |
 | Durable Background Worker & Lease Recovery | Ready | Tested for idempotency, cancellation, and stale-lease recovery |
 | Asset Upload & Signed Download URLs | Ready | Disk storage with MIME allowlist, 25MB limit, HMAC signed URLs |

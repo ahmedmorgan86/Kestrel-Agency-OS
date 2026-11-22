@@ -2,7 +2,7 @@
 
 ## 1. Core Architectural Principle
 Kestrel Agency OS is an internal **AI-First Social Media Agency Operating System** engineered under a strict **zero-simulation** contract:
-- Every record shown in the UI is backed by persistent relational tables on disk (`./data/kestrel-agency.sqlite` using Node 22 `node:sqlite` with WAL mode and `PRAGMA foreign_keys = ON`).
+- Operational records are backed by relational tables (`SQLITE_DB_PATH`, SQLite WAL mode, and `PRAGMA foreign_keys = ON`). The 30-person `@morgangroup.example` roster and photorealistic HQ avatars are fictional visual sample data; they must not be represented as employed staff or factual company activity.
 - Zero fake clients, zero fabricated analytics metrics, zero simulated publishing calls, and zero synthetic agent runs are ever seeded or returned.
 - All external AI models and social APIs are accessed exclusively server-side through provider adapters that return honest, structured failure diagnostics when credentials or permissions are missing.
 
@@ -55,6 +55,6 @@ Migrations live in `server/db/migrations.ts` (and a production PostgreSQL equiva
 - Rejections and change requests require an explicit rationale.
 
 ## 5. Production Scaling Path
-- **Database**: Swap `server/db/database.ts` to PostgreSQL (`pg` / Drizzle) using `docs/migrations/001_postgresql_schema.sql`.
+- **Database**: Runtime currently uses one SQLite database per persistent application host. `docs/migrations/001_postgresql_schema.sql` is reference DDL only; multi-instance use requires implementing and validating a PostgreSQL runtime adapter before deployment.
 - **Object Storage**: Swap `server/services/storage.ts` to S3/GCS/R2 signed PUT/GET URLs while preserving checksum and MIME validation.
 - **Worker Topology**: Run `worker.ts` as an independent horizontal worker pool; `background_jobs` lease ownership (`locked_by`, `lease_expires_at`) already coordinates multi-worker claiming and stale-lease recovery.

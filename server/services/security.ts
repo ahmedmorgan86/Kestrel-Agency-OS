@@ -20,6 +20,35 @@ export function generateId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID().replace(/-/g, '')}`;
 }
 
+export function assertProductionSecrets(): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  const missing = ['SESSION_SECRET', 'CREDENTIAL_ENCRYPTION_KEY']
+    .filter((name) => (process.env[name] || '').length < 32);
+  if (missing.length > 0) {
+    throw new Error(`Production requires ${missing.join(' and ')} to be set to random values of at least 32 characters.`);
+  }
+}
+
+export function getSecurityReadiness() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const checks = {
+    sessionSecret: (process.env.SESSION_SECRET || '').length >= 32,
+    credentialEncryptionKey: (process.env.CREDENTIAL_ENCRYPTION_KEY || '').length >= 32,
+    persistentDatabasePath: Boolean(process.env.SQLITE_DB_PATH && pathIsAbsolute(process.env.SQLITE_DB_PATH)),
+    persistentStoragePath: Boolean(process.env.STORAGE_ROOT_DIR && pathIsAbsolute(process.env.STORAGE_ROOT_DIR)),
+  };
+  return {
+    environment: isProduction ? 'production' : 'development',
+    ready: Object.values(checks).every(Boolean),
+    checks,
+  };
+}
+
+function pathIsAbsolute(value: string): boolean {
+  // Keep this helper local to avoid exposing or logging configured filesystem paths.
+  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
+}
+
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
   const derived = crypto.scryptSync(password, salt, 64).toString('hex');
