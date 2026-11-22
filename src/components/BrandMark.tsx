@@ -82,7 +82,7 @@ export function BrandLockup({
       <BrandSymbol symbol={symbol} primaryColor={primaryColor} size={variant === 'lockup' ? 36 : 30} className="shrink-0" />
       <div className="min-w-0 leading-tight">
         <div className="font-bold tracking-tight text-slate-900 dark:text-slate-100 font-[var(--font-display)] truncate text-sm sm:text-[15px]">
-          {name || 'Kestrel Social Agency'}
+          {name || 'MORGAN GROUP'}
         </div>
         {variant === 'lockup' && tagline && (
           <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{tagline}</div>

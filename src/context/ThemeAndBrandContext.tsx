@@ -12,9 +12,9 @@ export interface CompanyBrandIdentity {
 }
 
 const DEFAULT_BRAND: CompanyBrandIdentity = {
-  name: 'Kestrel Social Agency',
-  legalName: 'Kestrel Social Media Operations LLC',
-  tagline: 'AI-First Social Media Operations',
+  name: 'MORGAN GROUP',
+  legalName: 'MORGAN GROUP',
+  tagline: 'Interactive Technology Company',
   primaryColor: '#1d4ed8',
   secondaryColor: '#0f172a',
   symbol: 'kestrel',

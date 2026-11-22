@@ -368,8 +368,8 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     DEFAULT_ORG_ID,
-    'Kestrel Social Agency',
-    'Kestrel Social Media Operations LLC',
+    'MORGAN GROUP',
+    'MORGAN GROUP',
     '',
     'USD',
     'UTC',

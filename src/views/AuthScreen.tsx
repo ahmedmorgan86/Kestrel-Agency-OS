@@ -24,7 +24,7 @@ export function AuthScreen({
 }) {
   const { theme, toggleTheme, brand } = useThemeAndBrand();
   const [fullName, setFullName] = useState('');
-  const [organizationName, setOrganizationName] = useState(brand.name || 'Kestrel Social Agency');
+  const [organizationName, setOrganizationName] = useState(brand.name || 'MORGAN GROUP');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +106,7 @@ export function AuthScreen({
                     value={organizationName}
                     onChange={(e) => setOrganizationName(e.target.value)}
                     className={INPUT_CLASS}
-                    placeholder="Kestrel Social Agency"
+                    placeholder="MORGAN GROUP"
                   />
                 </FormField>
 
