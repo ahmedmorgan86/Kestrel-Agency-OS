@@ -45,8 +45,8 @@ import { BrandLockup } from './components/BrandMark';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { AuthScreen, type AuthUser } from './views/AuthScreen';
 import { DashboardView, NotificationsView, TaskCenterView } from './views/DashboardAndCommand';
-import { ChairmanCommand } from './views/ChairmanCommand';
 import { AcademyView } from './views/AcademyView';
+import { FounderCommandView } from './views/FounderCommandView';
 import {
   BrandProfilesView,
   ClientsCrmView,
@@ -54,11 +54,10 @@ import {
   ResearchIntelligenceView,
 } from './views/ClientsAndStrategy';
 import {
-  ApprovalCenterView,
   AssetLibraryView,
-  ContentStudioView,
   PublishingCenterView,
 } from './views/StudioAndGovernance';
+import { ApprovalCenterView, ContentStudioView } from './views/ContentAndApproval';
 import {
   AgentWorkforceView,
   AnalyticsView,
@@ -73,11 +72,8 @@ import {
 } from './views/OrgAndSystem';
 import { DepartmentWorkspaceView, VirtualHqView } from './views/VirtualHqView';
 import { MeetingsView } from './views/MeetingsView';
-import {
-  AiAgentProfileView,
-  HumanEmployeeProfileView,
-  MyWorkspaceView,
-} from './views/ProfilesAndWorkspace';
+import { AiAgentProfileView, MyWorkspaceView } from './views/ProfilesAndWorkspace';
+import { EmployeeSummaryView as HumanEmployeeProfileView } from './views/EmployeeSummaryView';
 
 interface NavGroup {
   label: string;
@@ -86,65 +82,27 @@ interface NavGroup {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Headquarters & Command',
+    label: 'الشركة والقيادة',
     items: [
-      { id: 'chairman', label: "Chairman's Office", icon: ShieldAlert },
-      { id: 'hq', label: 'Company HQ', icon: Building2 },
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'workspace', label: 'My Workspace', icon: UserCheck },
-      { id: 'meetings', label: 'Virtual Meetings', icon: Video },
-      { id: 'tasks', label: 'Task Center', icon: CheckSquare },
-      { id: 'notifications', label: 'Notifications', icon: Bell },
-      { id: 'academy', label: 'MORGAN Academy', icon: BookOpenCheck },
+      { id: 'hq', label: 'مقر الشركة ثلاثي الأبعاد', icon: Building2 },
+      { id: 'chairman', label: 'لوحة المالك', icon: ShieldAlert },
+      { id: 'meetings', label: 'الاجتماعات', icon: Video },
+      { id: 'employees', label: 'فريق العمل', icon: Users },
+      { id: 'orgchart', label: 'الهيكل الإداري', icon: Network },
     ],
   },
   {
-    label: 'Clients & Strategy',
+    label: 'إنتاج المحتوى',
     items: [
-      { id: 'clients', label: 'Client CRM', icon: Briefcase },
-      { id: 'brands', label: 'Brand Profiles', icon: Palette },
-      { id: 'projects', label: 'Projects', icon: FolderKanban },
-      { id: 'campaigns', label: 'Campaigns', icon: Megaphone },
-      { id: 'trends', label: 'Trend Intelligence', icon: Compass },
-      { id: 'competitors', label: 'Competitor Research', icon: Layers },
+      { id: 'content', label: 'استوديو المحتوى', icon: PenTool },
+      { id: 'calendar', label: 'تقويم المحتوى', icon: Calendar },
+      { id: 'approvals', label: 'موافقتي قبل النشر', icon: FileCheck2 },
     ],
   },
   {
-    label: 'Production & Governance',
+    label: 'التدريب والتطوير',
     items: [
-      { id: 'content', label: 'Content Studio', icon: PenTool },
-      { id: 'calendar', label: 'Content Calendar', icon: Calendar },
-      { id: 'approvals', label: 'Approval Center', icon: FileCheck2 },
-      { id: 'assets', label: 'Asset Library', icon: HardDrive },
-      { id: 'publishing', label: 'Publishing Center', icon: Send },
-    ],
-  },
-  {
-    label: 'AI Workforce',
-    items: [
-      { id: 'agents', label: 'AI Agent Center', icon: Bot },
-      { id: 'executions', label: 'Execution History', icon: History },
-    ],
-  },
-  {
-    label: 'Analytics & Finance',
-    items: [
-      { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-      { id: 'finance', label: 'Financial Management', icon: DollarSign },
-    ],
-  },
-  {
-    label: 'Organization & System',
-    items: [
-      { id: 'orgchart', label: 'Org Chart', icon: Network },
-      { id: 'company', label: 'Company Overview', icon: Building2 },
-      { id: 'departments', label: 'Departments', icon: Layers },
-      { id: 'employees', label: 'Employees', icon: Users },
-      { id: 'roles', label: 'Roles & Permissions', icon: KeyRound },
-      { id: 'integrations', label: 'Integrations', icon: Link2 },
-      { id: 'audit', label: 'Audit Logs', icon: ShieldAlert },
-      { id: 'health', label: 'System Health', icon: Activity },
-      { id: 'settings', label: 'Brand & Settings', icon: Settings },
+      { id: 'academy', label: 'أكاديمية مورغان', icon: BookOpenCheck },
     ],
   },
 ];
@@ -162,7 +120,7 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [route, setRoute] = useState('chairman');
+  const [route, setRoute] = useState('hq');
   const [activeDetail, setActiveDetail] = useState<ActiveDetail | null>(null);
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -266,7 +224,7 @@ export default function App() {
         onAuthenticated={(u) => {
           setUser(u);
           setInitialized(true);
-          setRoute('chairman');
+          setRoute('hq');
           void loadOrganizationBrand();
         }}
       />
@@ -309,10 +267,10 @@ export default function App() {
 
   const detailBreadcrumb = activeDetail
     ? activeDetail.kind === 'employee'
-      ? 'Employee Profile'
+      ? 'ملف الموظف'
       : activeDetail.kind === 'agent'
-      ? 'AI Agent Profile'
-      : 'Department Workspace'
+      ? 'ملف وكيل الذكاء الاصطناعي'
+      : 'مساحة القسم'
     : null;
 
   const renderView = () => {
@@ -322,9 +280,6 @@ export default function App() {
           <HumanEmployeeProfileView
             employeeId={activeDetail.id}
             onBack={() => setActiveDetail(null)}
-            onOpenEmployee={openEmployee}
-            onOpenAgent={openAgent}
-            onOpenDepartment={openDepartment}
           />
         );
       }
@@ -354,14 +309,14 @@ export default function App() {
 
     switch (route) {
       case 'chairman':
-        return <ChairmanCommand onNavigate={navigate} />;
+        return <FounderCommandView onNavigate={navigate} />;
       case 'academy':
         return <AcademyView />;
       case 'hq':
         return (
           <VirtualHqView
             key="hq-3d"
-            initialTab="lobby"
+            initialTab="hq3d"
             onOpenEmployee={openEmployee}
             onOpenAgent={openAgent}
             onOpenDepartment={openDepartment}
@@ -454,12 +409,7 @@ export default function App() {
           />
         );
       case 'employees':
-        return (
-          <EmployeesAndRolesView
-            mode="employees"
-            onOpenEmployee={openEmployee}
-          />
-        );
+        return <VirtualHqView key="hq-directory" initialTab="directory" onOpenEmployee={openEmployee} onOpenAgent={openAgent} onOpenDepartment={openDepartment} onOpenMeeting={openMeeting} onNavigate={navigate} />;
       case 'roles':
         return <EmployeesAndRolesView mode="roles" />;
       case 'integrations':
@@ -473,7 +423,7 @@ export default function App() {
       default:
         return (
           <VirtualHqView
-            initialTab="lobby"
+            initialTab="hq3d"
             onOpenEmployee={openEmployee}
             onOpenAgent={openAgent}
             onOpenDepartment={openDepartment}
@@ -491,7 +441,7 @@ export default function App() {
     .join('');
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800">
       <div className="h-14 px-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
         <button
           type="button"
@@ -509,14 +459,14 @@ export default function App() {
         <button
           type="button"
           onClick={() => setMobileMenuOpen(false)}
-          aria-label="Close navigation menu"
+          aria-label="إغلاق قائمة التنقل"
           className="lg:hidden p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 shrink-0"
         >
           <X className="w-5 h-5" />
         </button>
       </div>
 
-      <nav aria-label="Primary workspace navigation" className="flex-1 overflow-y-auto py-3 px-2.5 space-y-5">
+      <nav aria-label="التنقل الرئيسي" className="flex-1 overflow-y-auto py-3 px-2.5 space-y-5">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
             <div className="px-2.5 pb-1.5 text-[11px] font-semibold tracking-wide text-slate-400 dark:text-slate-500">
@@ -575,7 +525,7 @@ export default function App() {
           className="w-full flex items-center justify-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
         >
           <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
-          Sign Out
+          تسجيل الخروج
         </button>
       </div>
     </div>
@@ -594,7 +544,7 @@ export default function App() {
           <div className="w-64 max-w-[85vw] h-full">{sidebarContent}</div>
           <button
             type="button"
-            aria-label="Dismiss navigation backdrop"
+              aria-label="إغلاق خلفية القائمة"
             className="flex-1 bg-slate-950/50"
             onClick={() => setMobileMenuOpen(false)}
           />
@@ -608,7 +558,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              aria-label="Open navigation menu"
+              aria-label="فتح قائمة التنقل"
               className="lg:hidden p-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-md"
             >
               <Menu className="w-5 h-5" />
@@ -648,11 +598,11 @@ export default function App() {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              aria-label="Global search"
+              aria-label="البحث في مساحة العمل"
               className="inline-flex items-center gap-2 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               <Search className="w-3.5 h-3.5" aria-hidden="true" />
-              <span className="hidden md:inline">Search workspace...</span>
+              <span className="hidden md:inline">ابحث في مساحة العمل...</span>
               <kbd className="hidden md:inline-block rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-1 py-0.5 text-[10px] font-mono text-slate-500 dark:text-slate-400">
                 ⌘K
               </kbd>
@@ -665,18 +615,14 @@ export default function App() {
                 className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800 whitespace-nowrap"
               >
                 <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                <span className="hidden sm:inline">Quick Create</span>
+                <span className="hidden sm:inline">إنشاء سريع</span>
                 <ChevronDown className="w-3 h-3" aria-hidden="true" />
               </button>
               {quickCreateOpen && (
                 <div className="absolute right-0 mt-1.5 w-52 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-1 z-50">
                   {[
-                    { label: 'New Virtual Meeting', route: 'meetings', icon: Video },
-                    { label: 'New Operational Task', route: 'tasks', icon: CheckSquare },
-                    { label: 'New Content Draft', route: 'content', icon: PenTool },
-                    { label: 'New Client Account', route: 'clients', icon: Briefcase },
-                    { label: 'Add Human Employee', route: 'employees', icon: Users },
-                    { label: 'Add Department', route: 'departments', icon: Layers },
+                    { label: 'اجتماع جديد', route: 'meetings', icon: Video },
+                    { label: 'مسودة محتوى جديدة', route: 'content', icon: PenTool },
                   ].map((act) => {
                     const ActIcon = act.icon;
                     return (
@@ -701,14 +647,14 @@ export default function App() {
               className="hidden xl:inline-flex items-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 whitespace-nowrap"
             >
               <FileCheck2 className="w-3.5 h-3.5" aria-hidden="true" />
-              Approvals
+              موافقتي للنشر
             </button>
 
             <button
               type="button"
               onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              aria-label={theme === 'dark' ? 'التبديل إلى المظهر الفاتح' : 'التبديل إلى المظهر الداكن'}
+              title={theme === 'dark' ? 'المظهر الفاتح' : 'المظهر الداكن'}
               className="inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

@@ -51,7 +51,7 @@ export function AuthScreen({
         onAuthenticated(res.user);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed.');
+      setError(err instanceof Error ? err.message : 'تعذر تسجيل الدخول. راجع البيانات وحاول مرة أخرى.');
     } finally {
       setSubmitting(false);
     }
@@ -63,11 +63,11 @@ export function AuthScreen({
         <button
           type="button"
           onClick={toggleTheme}
-          aria-label="Toggle light and dark theme"
+          aria-label="تبديل المظهر الفاتح والداكن"
           className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
         >
           {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-          {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          {theme === 'dark' ? 'المظهر الفاتح' : 'المظهر الداكن'}
         </button>
       </div>
 
@@ -82,12 +82,12 @@ export function AuthScreen({
           />
         </div>
         <h1 className="mt-6 text-center text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-          {initialized ? 'Sign in to MORGAN GROUP' : 'Initialize MORGAN GROUP'}
+          {initialized ? 'تسجيل الدخول إلى MORGAN GROUP' : 'إعداد MORGAN GROUP لأول مرة'}
         </h1>
         <p className="mt-2 text-center text-sm text-slate-600 dark:text-slate-400">
           {initialized
-            ? 'Sign in to your organization workspace, operational records, staff, and configured AI tools.'
-            : 'Create the first administrator account for this workspace. This securely initializes the local company database.'}
+            ? 'سجّل دخولك إلى مساحة شركتك الخاصة لإدارة الفريق وإنتاج محتوى التواصل الاجتماعي.'
+            : 'أنشئ حساب المالك الأول لتهيئة مساحة شركتك الخاصة. الحساب مخصص لك وحدك.'}
         </p>
       </div>
 
@@ -98,7 +98,7 @@ export function AuthScreen({
 
             {!initialized && (
               <>
-                <FormField label="Operating Company Name" htmlFor="org-name" required>
+                <FormField label="اسم الشركة" htmlFor="org-name" required>
                   <input
                     id="org-name"
                     type="text"
@@ -110,7 +110,7 @@ export function AuthScreen({
                   />
                 </FormField>
 
-                <FormField label="Administrator Full Name" htmlFor="full-name" required>
+                <FormField label="اسم المالك بالكامل" htmlFor="full-name" required>
                   <input
                     id="full-name"
                     type="text"
@@ -118,13 +118,13 @@ export function AuthScreen({
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     className={INPUT_CLASS}
-                    placeholder="e.g., Nadia Haddad"
+                    placeholder="اكتب اسمك بالكامل"
                   />
                 </FormField>
               </>
             )}
 
-            <FormField label="Work Email" htmlFor="auth-email" required>
+            <FormField label="البريد الإلكتروني" htmlFor="auth-email" required>
               <input
                 id="auth-email"
                 type="email"
@@ -133,15 +133,15 @@ export function AuthScreen({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className={INPUT_CLASS}
-                placeholder="name@agency.com"
+                placeholder="name@example.com"
               />
             </FormField>
 
             <FormField
-              label="Password"
+              label="كلمة المرور"
               htmlFor="auth-password"
               required
-              hint={!initialized ? 'Minimum 8 characters. Hashed server-side using scrypt.' : undefined}
+              hint={!initialized ? 'ثمانية أحرف على الأقل. تُحفظ كلمة المرور مشفّرة.' : undefined}
             >
               <input
                 id="auth-password"
@@ -152,7 +152,7 @@ export function AuthScreen({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={INPUT_CLASS}
-                placeholder="Enter password"
+                placeholder="أدخل كلمة المرور"
               />
             </FormField>
 
@@ -161,18 +161,18 @@ export function AuthScreen({
                 <Lock className="w-4 h-4" aria-hidden="true" />
                 {submitting
                   ? initialized
-                    ? 'Signing in...'
-                    : 'Initializing workspace...'
+                    ? 'جارٍ تسجيل الدخول...'
+                    : 'جارٍ إعداد مساحة الشركة...'
                   : initialized
-                  ? 'Sign In'
-                  : 'Create Administrator & Continue'}
+                  ? 'تسجيل الدخول'
+                  : 'إنشاء حساب المالك والمتابعة'}
               </button>
             </div>
           </form>
 
           <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 space-y-1">
-            <p>Private workspace · Server-enforced roles · Recorded activity</p>
-            <p>Illustrative HQ avatars and sample staff are labeled; real records are stored in the company database.</p>
+            <p>مساحة خاصة · الحساب لك وحدك · سجل واضح للقرارات</p>
+            <p>الشخصيات داخل المقر افتراضية، أما المهام والمحتوى والقرارات فتُحفظ في قاعدة بيانات شركتك.</p>
           </div>
         </div>
       </div>

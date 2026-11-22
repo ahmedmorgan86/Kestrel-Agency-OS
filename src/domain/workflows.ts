@@ -18,20 +18,20 @@ export const CONTENT_STATUSES = [
 export type ContentStatus = (typeof CONTENT_STATUSES)[number];
 
 export const CONTENT_STATUS_LABELS: Record<ContentStatus, string> = {
-  idea: 'Idea',
-  brief: 'Brief',
-  strategy_review: 'Strategy Review',
-  draft: 'Draft',
-  creative_production: 'Creative Production',
-  quality_assurance: 'Quality Assurance',
-  human_review: 'Human Review',
-  changes_requested: 'Changes Requested',
-  approved: 'Approved',
-  scheduled: 'Scheduled',
-  publishing: 'Publishing',
-  published: 'Published',
-  analytics_collection: 'Analytics Collection',
-  archived: 'Archived',
+  idea: 'فكرة',
+  brief: 'توجيه إبداعي',
+  strategy_review: 'مراجعة الاستراتيجية',
+  draft: 'مسودة',
+  creative_production: 'إنتاج إبداعي',
+  quality_assurance: 'مراجعة الجودة',
+  human_review: 'بانتظار قرار المالك',
+  changes_requested: 'مطلوب تعديل',
+  approved: 'معتمد من المالك',
+  scheduled: 'مجدول',
+  publishing: 'جارٍ النشر',
+  published: 'تم النشر',
+  analytics_collection: 'تحليل النتائج',
+  archived: 'مؤرشف',
 };
 
 export const ALLOWED_CONTENT_TRANSITIONS: Record<ContentStatus, readonly ContentStatus[]> = {
@@ -100,18 +100,18 @@ export const TASK_STATUSES = [
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  queued: 'Queued',
-  assigned: 'Assigned',
-  running: 'Running',
-  validating: 'Validating',
-  waiting_for_input: 'Waiting for Input',
-  waiting_for_approval: 'Waiting for Approval',
-  in_review: 'In Review',
-  completed: 'Completed',
-  failed: 'Failed',
-  retrying: 'Retrying',
-  rejected: 'Rejected',
-  cancelled: 'Cancelled',
+  queued: 'في قائمة الانتظار',
+  assigned: 'مسندة',
+  running: 'قيد التنفيذ',
+  validating: 'قيد التحقق',
+  waiting_for_input: 'تنتظر مدخلات',
+  waiting_for_approval: 'تنتظر موافقة المالك',
+  in_review: 'قيد المراجعة',
+  completed: 'مكتملة',
+  failed: 'فشلت',
+  retrying: 'إعادة المحاولة',
+  rejected: 'مرفوضة',
+  cancelled: 'ملغاة',
 };
 
 export const PUBLISHING_STATES = [
