@@ -213,6 +213,11 @@ authAndOrgRouter.patch('/organization', requirePermission('org:manage'), (req: A
     website: z.string().trim().max(240).optional(),
     timezone: z.string().trim().max(64).optional(),
     defaultCurrency: z.string().trim().length(3).optional(),
+    tagline: z.string().trim().max(200).optional(),
+    brandPrimaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    brandSecondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    brandSymbol: z.enum(['kestrel', 'prism', 'compass', 'aperture']).optional(),
+    logoStyle: z.enum(['lockup', 'compact', 'symbol']).optional(),
     governancePolicy: z.record(z.string(), z.boolean()).optional(),
   });
   const parsed = schema.safeParse(req.body);
@@ -225,7 +230,9 @@ authAndOrgRouter.patch('/organization', requirePermission('org:manage'), (req: A
   const ts = nowIso();
   db.prepare(
     `UPDATE organizations
-     SET name = ?, legal_name = ?, website = ?, timezone = ?, default_currency = ?, governance_policy_json = ?, updated_at = ?
+     SET name = ?, legal_name = ?, website = ?, timezone = ?, default_currency = ?,
+         tagline = ?, brand_primary_color = ?, brand_secondary_color = ?, brand_symbol = ?, logo_style = ?,
+         governance_policy_json = ?, updated_at = ?
      WHERE id = ?`
   ).run(
     parsed.data.name ?? existing.name,
@@ -233,6 +240,11 @@ authAndOrgRouter.patch('/organization', requirePermission('org:manage'), (req: A
     parsed.data.website ?? existing.website,
     parsed.data.timezone ?? existing.timezone,
     parsed.data.defaultCurrency ?? existing.default_currency,
+    parsed.data.tagline ?? existing.tagline ?? 'AI-First Social Media Operations',
+    parsed.data.brandPrimaryColor ?? existing.brand_primary_color ?? '#1d4ed8',
+    parsed.data.brandSecondaryColor ?? existing.brand_secondary_color ?? '#0f172a',
+    parsed.data.brandSymbol ?? existing.brand_symbol ?? 'kestrel',
+    parsed.data.logoStyle ?? existing.logo_style ?? 'lockup',
     parsed.data.governancePolicy ? JSON.stringify(parsed.data.governancePolicy) : existing.governance_policy_json,
     ts,
     DEFAULT_ORG_ID

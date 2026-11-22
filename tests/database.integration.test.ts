@@ -30,7 +30,10 @@ test('database migrations, honest system config seed, auth bootstrap, credential
     .prepare("SELECT status FROM integrations WHERE provider_code = 'supabase'")
     .get() as { status: string } | undefined;
 
-  assert.equal(deptCount, 11);
+  const meetingRoomCount = (db.prepare('SELECT COUNT(*) as c FROM meeting_rooms').get() as { c: number }).c;
+
+  assert.equal(deptCount, 13);
+  assert.equal(meetingRoomCount, 4);
   assert.equal(agentCount, 14);
   assert.equal(clientCount, 0, 'Production seed must contain zero fabricated clients');
   assert.equal(runCount, 0, 'Production seed must contain zero fabricated agent executions');

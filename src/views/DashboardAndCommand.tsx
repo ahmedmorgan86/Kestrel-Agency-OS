@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Play, Plus, RefreshCw, Check } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { Building2, Play, Plus, RefreshCw, Check, Video, ArrowRight } from 'lucide-react';
 import { apiRequest } from '../lib/api';
 import { formatCurrencyCents } from '../domain/finance';
 import { TASK_STATUSES, TASK_STATUS_LABELS, type TaskStatus } from '../domain/workflows';
@@ -20,10 +20,20 @@ import {
   formatShortDate,
 } from '../components/ui';
 
-export function DashboardView({ onNavigate }: { onNavigate: (route: string) => void }) {
+export function DashboardView({
+  onNavigate,
+  onOpenAgent,
+  onOpenMeeting,
+}: {
+  onNavigate: (route: string) => void;
+  onOpenAgent?: (agentId: string) => void;
+  onOpenMeeting?: (meetingId?: string) => void;
+}) {
   const [data, setData] = useState<Record<string, any> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [agentFilter, setAgentFilter] = useState('');
+  const [agentStatusFilter, setAgentStatusFilter] = useState<'all' | 'active' | 'paused'>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,13 +52,28 @@ export function DashboardView({ onNavigate }: { onNavigate: (route: string) => v
     void load();
   }, [load]);
 
+  const workload = (data?.agentWorkload ?? []) as Array<Record<string, any>>;
+  const filteredWorkload = useMemo(() => {
+    return workload.filter((a) => {
+      if (agentStatusFilter !== 'all' && a.status !== agentStatusFilter) return false;
+      if (agentFilter.trim()) {
+        const q = agentFilter.trim().toLowerCase();
+        return (
+          String(a.name || '').toLowerCase().includes(q) ||
+          String(a.model_identifier || '').toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [workload, agentFilter, agentStatusFilter]);
+
   if (loading && !data) {
     return (
       <div className="space-y-6">
         <PageHeader title="Operations Dashboard" subtitle="Loading live database metrics..." />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-24 bg-white border border-slate-200 rounded-lg animate-pulse" />
+            <div key={i} className="h-24 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg animate-pulse" />
           ))}
         </div>
       </div>
@@ -57,7 +82,6 @@ export function DashboardView({ onNavigate }: { onNavigate: (route: string) => v
 
   const m = data?.metrics ?? {};
   const fin = data?.finance ?? {};
-  const workload = (data?.agentWorkload ?? []) as Array<Record<string, any>>;
   const integrations = (data?.integrations ?? []) as Array<Record<string, any>>;
   const activity = (data?.recentActivity ?? []) as Array<Record<string, any>>;
 
@@ -65,12 +89,16 @@ export function DashboardView({ onNavigate }: { onNavigate: (route: string) => v
     <div className="space-y-6">
       <PageHeader
         title="Operations Dashboard"
-        subtitle="Real-time agency metrics queried directly from persistent storage. Unpopulated counters reflect actual database state."
+        subtitle="Real-time agency metrics queried directly from persistent storage. Click any KPI to drill directly into the underlying module."
         actions={
           <>
             <button type="button" onClick={load} className={SECONDARY_BTN}>
               <RefreshCw className="w-4 h-4" aria-hidden="true" />
               Refresh
+            </button>
+            <button type="button" onClick={() => onNavigate('hq')} className={SECONDARY_BTN}>
+              <Building2 className="w-4 h-4" aria-hidden="true" />
+              Enter 3D HQ
             </button>
             <button type="button" onClick={() => onNavigate('clients')} className={PRIMARY_BTN}>
               <Plus className="w-4 h-4" aria-hidden="true" />
@@ -82,43 +110,94 @@ export function DashboardView({ onNavigate }: { onNavigate: (route: string) => v
 
       <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
+      {/* HQ & Virtual Meetings Quick Operations Strip */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <button
+          type="button"
+          onClick={() => onNavigate('hq')}
+          className="text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 rounded-lg p-4 flex items-center justify-between gap-4 transition-colors"
+        >
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Interactive 3D Company Headquarters
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Explore 13 departments, live human & AI operational states, org chart, and 2D floor map.
+              </div>
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => (onOpenMeeting ? onOpenMeeting() : onNavigate('meetings'))}
+          className="text-left bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 rounded-lg p-4 flex items-center justify-between gap-4 transition-colors"
+        >
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Video className="w-5 h-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Virtual Meeting Rooms & AI Discussions
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Host Human + AI conference sessions, record decisions, and convert action items into tasks.
+              </div>
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+        </button>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatTile label="Active Clients" value={m.activeClients ?? 0} meta="Non-archived CRM accounts" />
-        <StatTile label="Active Projects" value={m.activeProjects ?? 0} meta="In active delivery" />
+        <StatTile label="Active Clients" value={m.activeClients ?? 0} meta="Non-archived CRM accounts" onClick={() => onNavigate('clients')} />
+        <StatTile label="Active Projects" value={m.activeProjects ?? 0} meta="In active delivery" onClick={() => onNavigate('projects')} />
         <StatTile
           label="Pending Tasks"
           value={m.pendingTasks ?? 0}
           meta={`${m.overdueTasks ?? 0} overdue`}
           tone={(m.overdueTasks ?? 0) > 0 ? 'danger' : 'default'}
+          onClick={() => onNavigate('tasks')}
         />
         <StatTile
           label="Pending Approvals"
           value={m.pendingApprovals ?? 0}
           meta="Human review gates"
           tone={(m.pendingApprovals ?? 0) > 0 ? 'warning' : 'default'}
+          onClick={() => onNavigate('approvals')}
         />
         <StatTile
           label="Published Content"
           value={m.publishedContent ?? 0}
           meta="Verified external posts"
           tone={(m.publishedContent ?? 0) > 0 ? 'positive' : 'default'}
+          onClick={() => onNavigate('publishing')}
         />
         <StatTile
           label="Failed Agent Runs"
           value={m.failedExecutions ?? 0}
           meta={`${m.activeAgents ?? 0}/${m.totalAgents ?? 0} agents active`}
           tone={(m.failedExecutions ?? 0) > 0 ? 'danger' : 'default'}
+          onClick={() => onNavigate('executions')}
         />
         <StatTile
           label="Collected Revenue"
           value={formatCurrencyCents(fin.totalCollectedCents ?? 0)}
           meta={`${formatCurrencyCents(fin.outstandingCents ?? 0)} outstanding`}
           tone="positive"
+          onClick={() => onNavigate('finance')}
         />
         <StatTile
           label="Actual Expenses + AI"
           value={formatCurrencyCents(fin.totalActualCostCents ?? 0)}
           meta={`AI usage: ${formatCurrencyCents(fin.aiUsageCostCents ?? 0)}`}
+          onClick={() => onNavigate('finance')}
         />
       </div>
 
@@ -128,16 +207,36 @@ export function DashboardView({ onNavigate }: { onNavigate: (route: string) => v
             title="AI Workforce Workload"
             description="Configured operational agents, live assigned tasks, and actual recorded run costs"
             right={
-              <button type="button" onClick={() => onNavigate('agents')} className="text-xs font-medium text-blue-700 hover:underline">
-                Manage 14 Agents
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="search"
+                  aria-label="Filter agents"
+                  placeholder="Filter agents..."
+                  value={agentFilter}
+                  onChange={(e) => setAgentFilter(e.target.value)}
+                  className={`${INPUT_CLASS} w-36 !py-1 text-xs`}
+                />
+                <select
+                  aria-label="Filter agent status"
+                  value={agentStatusFilter}
+                  onChange={(e) => setAgentStatusFilter(e.target.value as 'all' | 'active' | 'paused')}
+                  className={`${INPUT_CLASS} w-28 !py-1 text-xs`}
+                >
+                  <option value="all">All</option>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                </select>
+                <button type="button" onClick={() => onNavigate('agents')} className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline whitespace-nowrap">
+                  All 14 Agents
+                </button>
+              </div>
             }
             noPadding
           >
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-xs font-medium text-slate-600 dark:text-slate-400">
                     <th className="py-2.5 px-4">Agent</th>
                     <th className="py-2.5 px-4">Model</th>
                     <th className="py-2.5 px-4 text-right">Open Tasks</th>
@@ -146,14 +245,18 @@ export function DashboardView({ onNavigate }: { onNavigate: (route: string) => v
                     <th className="py-2.5 px-4">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {workload.slice(0, 8).map((a) => (
-                    <tr key={a.id} className="hover:bg-slate-50">
-                      <td className="py-2.5 px-4 font-medium text-slate-900">{a.name}</td>
-                      <td className="py-2.5 px-4 font-mono text-xs text-slate-600">{a.model_identifier}</td>
-                      <td className="py-2.5 px-4 text-right font-mono tabular-nums">{a.open_tasks}</td>
-                      <td className="py-2.5 px-4 text-right font-mono tabular-nums">{a.total_runs}</td>
-                      <td className="py-2.5 px-4 text-right font-mono tabular-nums">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {filteredWorkload.slice(0, 10).map((a) => (
+                    <tr
+                      key={a.id}
+                      onClick={onOpenAgent ? () => onOpenAgent(a.id) : undefined}
+                      className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 ${onOpenAgent ? 'cursor-pointer' : ''}`}
+                    >
+                      <td className="py-2.5 px-4 font-medium text-slate-900 dark:text-slate-100">{a.name}</td>
+                      <td className="py-2.5 px-4 font-mono text-xs text-slate-600 dark:text-slate-400">{a.model_identifier}</td>
+                      <td className="py-2.5 px-4 text-right font-mono tabular-nums text-slate-800 dark:text-slate-200">{a.open_tasks}</td>
+                      <td className="py-2.5 px-4 text-right font-mono tabular-nums text-slate-800 dark:text-slate-200">{a.total_runs}</td>
+                      <td className="py-2.5 px-4 text-right font-mono tabular-nums text-slate-800 dark:text-slate-200">
                         ${Number(a.total_cost_usd || 0).toFixed(4)}
                       </td>
                       <td className="py-2.5 px-4">
@@ -161,6 +264,13 @@ export function DashboardView({ onNavigate }: { onNavigate: (route: string) => v
                       </td>
                     </tr>
                   ))}
+                  {filteredWorkload.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-6 px-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                        No agents match the active filter.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -171,18 +281,18 @@ export function DashboardView({ onNavigate }: { onNavigate: (route: string) => v
           title="External Integrations"
           description="Real credential and verification status"
           right={
-            <button type="button" onClick={() => onNavigate('integrations')} className="text-xs font-medium text-blue-700 hover:underline">
+            <button type="button" onClick={() => onNavigate('integrations')} className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline">
               Configure
             </button>
           }
         >
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
             {integrations.map((integ) => (
               <div key={integ.provider_code} className="py-2.5 first:pt-0 last:pb-0 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900 leading-snug">{integ.display_name}</div>
+                  <div className="text-sm font-medium text-slate-900 dark:text-slate-100 leading-snug">{integ.display_name}</div>
                   {integ.last_error && (
-                    <div className="mt-0.5 text-xs text-slate-500 line-clamp-2">{integ.last_error}</div>
+                    <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{integ.last_error}</div>
                   )}
                 </div>
                 <div className="shrink-0 pt-0.5">
@@ -198,21 +308,21 @@ export function DashboardView({ onNavigate }: { onNavigate: (route: string) => v
         title="Recent Immutable Activity"
         description="Audited operational events recorded in the database"
         right={
-          <button type="button" onClick={() => onNavigate('audit')} className="text-xs font-medium text-blue-700 hover:underline">
+          <button type="button" onClick={() => onNavigate('audit')} className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline">
             Full Audit Log
           </button>
         }
         noPadding
       >
         {activity.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-500">
+          <div className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">
             No operational events recorded yet. Actions taken across the workspace appear here automatically.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-xs font-medium text-slate-600 dark:text-slate-400">
                   <th className="py-2.5 px-4">Timestamp</th>
                   <th className="py-2.5 px-4">Actor</th>
                   <th className="py-2.5 px-4">Action</th>
@@ -220,20 +330,20 @@ export function DashboardView({ onNavigate }: { onNavigate: (route: string) => v
                   <th className="py-2.5 px-4">Correlation ID</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                 {activity.map((ev) => (
-                  <tr key={ev.id} className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-mono text-xs text-slate-600 whitespace-nowrap">
+                  <tr key={ev.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <td className="py-2.5 px-4 font-mono text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">
                       {formatDateTime(ev.created_at)}
                     </td>
-                    <td className="py-2.5 px-4 text-slate-900">
-                      {ev.actor_label} <span className="text-xs text-slate-500">· {ev.actor_type}</span>
+                    <td className="py-2.5 px-4 text-slate-900 dark:text-slate-100">
+                      {ev.actor_label} <span className="text-xs text-slate-500 dark:text-slate-400">· {ev.actor_type}</span>
                     </td>
-                    <td className="py-2.5 px-4 font-mono text-xs text-slate-800">{ev.action}</td>
-                    <td className="py-2.5 px-4 text-xs text-slate-600">
+                    <td className="py-2.5 px-4 font-mono text-xs text-slate-800 dark:text-slate-200">{ev.action}</td>
+                    <td className="py-2.5 px-4 text-xs text-slate-600 dark:text-slate-400">
                       {ev.entity_type} / <span className="font-mono">{ev.entity_id}</span>
                     </td>
-                    <td className="py-2.5 px-4 font-mono text-xs text-slate-500">{ev.correlation_id}</td>
+                    <td className="py-2.5 px-4 font-mono text-xs text-slate-500 dark:text-slate-400">{ev.correlation_id}</td>
                   </tr>
                 ))}
               </tbody>
@@ -500,10 +610,10 @@ export function TaskCenterView() {
           }
         />
       ) : viewMode === 'list' ? (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-xs font-medium text-slate-600 dark:text-slate-400">
                 <th className="py-3 px-4">Task</th>
                 <th className="py-3 px-4">Client / Project</th>
                 <th className="py-3 px-4">Assigned Agent</th>
@@ -513,29 +623,29 @@ export function TaskCenterView() {
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
               {tasks.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50">
+                <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                   <td className="py-3 px-4">
-                    <div className="font-medium text-slate-900">{t.title}</div>
-                    <div className="text-xs text-slate-500">
+                    <div className="font-medium text-slate-900 dark:text-slate-100">{t.title}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
                       {t.task_type} {t.requires_approval ? '· Human Approval Gate' : ''}
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-xs text-slate-600">
+                  <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-400">
                     {t.client_name || 'Internal'} {t.project_name ? `/ ${t.project_name}` : ''}
                   </td>
-                  <td className="py-3 px-4 text-xs text-slate-700">{t.agent_name || 'Unassigned'}</td>
+                  <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">{t.agent_name || 'Unassigned'}</td>
                   <td className="py-3 px-4">
                     <StatusText status={t.priority} />
                   </td>
-                  <td className="py-3 px-4 font-mono text-xs text-slate-600">{formatShortDate(t.due_date)}</td>
+                  <td className="py-3 px-4 font-mono text-xs text-slate-600 dark:text-slate-400">{formatShortDate(t.due_date)}</td>
                   <td className="py-3 px-4">
                     <select
                       aria-label={`Status for ${t.title}`}
                       value={t.status}
                       onChange={(e) => handleStatusChange(t.id, e.target.value as TaskStatus)}
-                      className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800"
+                      className="rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs text-slate-800 dark:text-slate-200"
                     >
                       {TASK_STATUSES.map((st) => (
                         <option key={st} value={st}>
@@ -566,19 +676,19 @@ export function TaskCenterView() {
           {kanbanColumns.map((col) => {
             const colTasks = tasks.filter((t) => col.statuses.includes(t.status));
             return (
-              <div key={col.key} className="bg-white border border-slate-200 rounded-lg p-3 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                  <h3 className="text-xs font-semibold text-slate-700">{col.title}</h3>
-                  <span className="font-mono text-xs text-slate-500 tabular-nums">{colTasks.length}</span>
+              <div key={col.key} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-3 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                  <h3 className="text-xs font-semibold text-slate-700 dark:text-slate-200">{col.title}</h3>
+                  <span className="font-mono text-xs text-slate-500 dark:text-slate-400 tabular-nums">{colTasks.length}</span>
                 </div>
                 {colTasks.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-4 text-center">Empty column</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 py-4 text-center">Empty column</p>
                 ) : (
                   <div className="space-y-2.5">
                     {colTasks.map((t) => (
-                      <div key={t.id} className="border border-slate-200 rounded-md p-3 bg-slate-50/50 space-y-2">
-                        <div className="text-sm font-medium text-slate-900">{t.title}</div>
-                        <div className="text-xs text-slate-500">
+                      <div key={t.id} className="border border-slate-200 dark:border-slate-700 rounded-md p-3 bg-slate-50/50 dark:bg-slate-800/50 space-y-2">
+                        <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{t.title}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
                           {t.agent_name || 'No agent'} · {formatShortDate(t.due_date)}
                         </div>
                         <div className="flex items-center justify-between pt-1">
@@ -587,7 +697,7 @@ export function TaskCenterView() {
                             <button
                               type="button"
                               onClick={() => handleDispatch(t.id)}
-                              className="text-xs font-medium text-blue-700 hover:underline"
+                              className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline"
                             >
                               Run
                             </button>

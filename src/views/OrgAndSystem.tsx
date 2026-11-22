@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, RefreshCw, Shield, Link as LinkIcon } from 'lucide-react';
+import { Plus, RefreshCw, Shield, Link as LinkIcon, ExternalLink, Moon, Sun } from 'lucide-react';
 import { apiRequest } from '../lib/api';
+import { useThemeAndBrand } from '../context/ThemeAndBrandContext';
+import { BrandLockup, BrandSymbol, type BrandSymbolType } from '../components/BrandMark';
 import {
   EmptyState,
   ErrorBanner,
@@ -16,14 +18,32 @@ import {
   formatDateTime,
 } from '../components/ui';
 
-export function CompanyAndDepartmentsView({ mode }: { mode: 'company' | 'departments' | 'settings' }) {
+export function CompanyAndDepartmentsView({
+  mode,
+  onOpenDepartment,
+}: {
+  mode: 'company' | 'departments' | 'settings';
+  onOpenDepartment?: (departmentId: string) => void;
+}) {
+  const { theme, toggleTheme, reducedMotion, setReducedMotion, updateBrandFromOrg } = useThemeAndBrand();
   const [org, setOrg] = useState<Record<string, any> | null>(null);
   const [departments, setDepartments] = useState<Array<Record<string, any>>>([]);
   const [counts, setCounts] = useState({ employees: 0, agents: 0 });
   const [modalOpen, setModalOpen] = useState(false);
   const [deptName, setDeptName] = useState('');
   const [deptDesc, setDeptDesc] = useState('');
-  const [orgForm, setOrgForm] = useState({ name: '', legalName: '', website: '', timezone: 'UTC', defaultCurrency: 'USD' });
+  const [orgForm, setOrgForm] = useState({
+    name: '',
+    legalName: '',
+    tagline: '',
+    website: '',
+    timezone: 'UTC',
+    defaultCurrency: 'USD',
+    brandPrimaryColor: '#1d4ed8',
+    brandSecondaryColor: '#0f172a',
+    brandSymbol: 'kestrel' as BrandSymbolType,
+    logoStyle: 'lockup' as 'lockup' | 'compact' | 'symbol',
+  });
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,18 +57,28 @@ export function CompanyAndDepartmentsView({ mode }: { mode: 'company' | 'departm
       setCounts({ employees: oRes.employeeCount, agents: oRes.agentCount });
       setDepartments(dRes.departments);
       if (oRes.organization) {
+        updateBrandFromOrg(oRes.organization);
         setOrgForm({
           name: oRes.organization.name || '',
           legalName: oRes.organization.legal_name || '',
+          tagline: oRes.organization.tagline || 'AI-First Social Media Operations',
           website: oRes.organization.website || '',
           timezone: oRes.organization.timezone || 'UTC',
           defaultCurrency: oRes.organization.default_currency || 'USD',
+          brandPrimaryColor: oRes.organization.brand_primary_color || '#1d4ed8',
+          brandSecondaryColor: oRes.organization.brand_secondary_color || '#0f172a',
+          brandSymbol: (['kestrel', 'prism', 'compass', 'aperture'].includes(oRes.organization.brand_symbol)
+            ? oRes.organization.brand_symbol
+            : 'kestrel') as BrandSymbolType,
+          logoStyle: (['lockup', 'compact', 'symbol'].includes(oRes.organization.logo_style)
+            ? oRes.organization.logo_style
+            : 'lockup') as 'lockup' | 'compact' | 'symbol',
         });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load organization.');
     }
-  }, []);
+  }, [updateBrandFromOrg]);
 
   useEffect(() => {
     void load();
@@ -73,8 +103,14 @@ export function CompanyAndDepartmentsView({ mode }: { mode: 'company' | 'departm
     setError(null);
     setNotice(null);
     try {
-      await apiRequest('/organization', { method: 'PATCH', body: orgForm });
-      setNotice('Organization settings updated and recorded in audit log.');
+      const res = await apiRequest<{ organization?: Record<string, unknown> }>('/organization', {
+        method: 'PATCH',
+        body: orgForm,
+      });
+      if (res.organization) {
+        updateBrandFromOrg(res.organization);
+      }
+      setNotice('Company brand identity and operational settings persisted and recorded in the audit log.');
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save organization settings.');
@@ -82,33 +118,215 @@ export function CompanyAndDepartmentsView({ mode }: { mode: 'company' | 'departm
   };
 
   if (mode === 'settings') {
+    const symbols: Array<{ id: BrandSymbolType; label: string; desc: string }> = [
+      { id: 'kestrel', label: 'Kestrel Wing', desc: 'Angular twin-wing precision mark' },
+      { id: 'prism', label: 'Prism Facet', desc: 'Architectural geometric prism' },
+      { id: 'compass', label: 'Strategic Compass', desc: 'Directional agency emblem' },
+      { id: 'aperture', label: 'Creative Aperture', desc: 'Studio lens geometry' },
+    ];
+
     return (
       <div className="space-y-6">
-        <PageHeader title="System Settings" subtitle="Operating company profile, currency, timezone, and governance configuration." />
+        <PageHeader
+          title="Company Brand Identity & Settings"
+          subtitle="Configure the operating company's visual identity, brand symbol, color tokens, appearance preferences, and operational defaults."
+        />
         <ErrorBanner message={error} onDismiss={() => setError(null)} />
-        {notice && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-900">{notice}</div>}
-        <SectionCard title="Company Profile & Operational Defaults">
-          <form onSubmit={handleSaveOrg} className="space-y-4 max-w-2xl">
-            <FormField label="Operating Company Name" htmlFor="set-name" required>
-              <input id="set-name" required value={orgForm.name} onChange={(e) => setOrgForm({ ...orgForm, name: e.target.value })} className={INPUT_CLASS} />
-            </FormField>
-            <FormField label="Legal Entity Name" htmlFor="set-legal">
-              <input id="set-legal" value={orgForm.legalName} onChange={(e) => setOrgForm({ ...orgForm, legalName: e.target.value })} className={INPUT_CLASS} />
-            </FormField>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <FormField label="Website" htmlFor="set-web">
-                <input id="set-web" value={orgForm.website} onChange={(e) => setOrgForm({ ...orgForm, website: e.target.value })} className={INPUT_CLASS} />
-              </FormField>
-              <FormField label="Timezone" htmlFor="set-tz">
-                <input id="set-tz" value={orgForm.timezone} onChange={(e) => setOrgForm({ ...orgForm, timezone: e.target.value })} className={INPUT_CLASS} />
-              </FormField>
-              <FormField label="Currency (ISO 4217)" htmlFor="set-curr">
-                <input id="set-curr" maxLength={3} value={orgForm.defaultCurrency} onChange={(e) => setOrgForm({ ...orgForm, defaultCurrency: e.target.value.toUpperCase() })} className={INPUT_CLASS} />
-              </FormField>
-            </div>
-            <button type="submit" className={PRIMARY_BTN}>Save Organization Settings</button>
-          </form>
-        </SectionCard>
+        {notice && (
+          <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg px-4 py-3 text-sm text-emerald-900 dark:text-emerald-200">
+            {notice}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <SectionCard
+              title="Configurable Brand Identity & Organization Profile"
+              description="Authorized administrators can customize the agency name, tagline, brand symbol, and primary colors without code changes."
+            >
+              <form onSubmit={handleSaveOrg} className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField label="Operating Company Name" htmlFor="set-name" required>
+                    <input
+                      id="set-name"
+                      required
+                      value={orgForm.name}
+                      onChange={(e) => setOrgForm({ ...orgForm, name: e.target.value })}
+                      className={INPUT_CLASS}
+                    />
+                  </FormField>
+                  <FormField label="Legal Entity Name" htmlFor="set-legal">
+                    <input
+                      id="set-legal"
+                      value={orgForm.legalName}
+                      onChange={(e) => setOrgForm({ ...orgForm, legalName: e.target.value })}
+                      className={INPUT_CLASS}
+                    />
+                  </FormField>
+                </div>
+
+                <FormField label="Agency Brand Tagline" htmlFor="set-tagline">
+                  <input
+                    id="set-tagline"
+                    value={orgForm.tagline}
+                    onChange={(e) => setOrgForm({ ...orgForm, tagline: e.target.value })}
+                    className={INPUT_CLASS}
+                    placeholder="AI-First Social Media Operations"
+                  />
+                </FormField>
+
+                <div>
+                  <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">Brand Symbol</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {symbols.map((sym) => {
+                      const active = orgForm.brandSymbol === sym.id;
+                      return (
+                        <button
+                          key={sym.id}
+                          type="button"
+                          onClick={() => setOrgForm({ ...orgForm, brandSymbol: sym.id })}
+                          className={`flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors ${
+                            active
+                              ? 'border-blue-600 bg-blue-50/70 dark:bg-blue-950/50 dark:border-blue-500'
+                              : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                          }`}
+                        >
+                          <BrandSymbol symbol={sym.id} primaryColor={orgForm.brandPrimaryColor} size={28} />
+                          <div>
+                            <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">{sym.label}</div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">{sym.desc}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <FormField label="Primary Brand Color" htmlFor="set-primary-color">
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="set-primary-color"
+                        type="color"
+                        value={orgForm.brandPrimaryColor}
+                        onChange={(e) => setOrgForm({ ...orgForm, brandPrimaryColor: e.target.value })}
+                        className="h-9 w-12 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 cursor-pointer"
+                      />
+                      <input
+                        value={orgForm.brandPrimaryColor}
+                        onChange={(e) => setOrgForm({ ...orgForm, brandPrimaryColor: e.target.value })}
+                        className={`${INPUT_CLASS} font-mono`}
+                        maxLength={7}
+                      />
+                    </div>
+                  </FormField>
+                  <FormField label="Secondary Slate Color" htmlFor="set-secondary-color">
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="set-secondary-color"
+                        type="color"
+                        value={orgForm.brandSecondaryColor}
+                        onChange={(e) => setOrgForm({ ...orgForm, brandSecondaryColor: e.target.value })}
+                        className="h-9 w-12 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 cursor-pointer"
+                      />
+                      <input
+                        value={orgForm.brandSecondaryColor}
+                        onChange={(e) => setOrgForm({ ...orgForm, brandSecondaryColor: e.target.value })}
+                        className={`${INPUT_CLASS} font-mono`}
+                        maxLength={7}
+                      />
+                    </div>
+                  </FormField>
+                  <FormField label="Logo Presentation" htmlFor="set-logo-style">
+                    <select
+                      id="set-logo-style"
+                      value={orgForm.logoStyle}
+                      onChange={(e) => setOrgForm({ ...orgForm, logoStyle: e.target.value as 'lockup' | 'compact' | 'symbol' })}
+                      className={INPUT_CLASS}
+                    >
+                      <option value="lockup">Full Lockup</option>
+                      <option value="compact">Compact Header</option>
+                      <option value="symbol">Symbol Mark</option>
+                    </select>
+                  </FormField>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <FormField label="Website" htmlFor="set-web">
+                    <input id="set-web" value={orgForm.website} onChange={(e) => setOrgForm({ ...orgForm, website: e.target.value })} className={INPUT_CLASS} />
+                  </FormField>
+                  <FormField label="Timezone" htmlFor="set-tz">
+                    <input id="set-tz" value={orgForm.timezone} onChange={(e) => setOrgForm({ ...orgForm, timezone: e.target.value })} className={INPUT_CLASS} />
+                  </FormField>
+                  <FormField label="Currency (ISO 4217)" htmlFor="set-curr">
+                    <input id="set-curr" maxLength={3} value={orgForm.defaultCurrency} onChange={(e) => setOrgForm({ ...orgForm, defaultCurrency: e.target.value.toUpperCase() })} className={INPUT_CLASS} />
+                  </FormField>
+                </div>
+
+                <div className="flex justify-end">
+                  <button type="submit" className={PRIMARY_BTN}>Save Brand & Organization Settings</button>
+                </div>
+              </form>
+            </SectionCard>
+          </div>
+
+          <div className="space-y-6">
+            <SectionCard title="Live Identity Preview" description="Light & dark header and report lockups">
+              <div className="space-y-3">
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="text-[11px] font-medium text-slate-400 mb-2">Light Surface</div>
+                  <BrandLockup
+                    name={orgForm.name || 'Agency'}
+                    tagline={orgForm.tagline}
+                    symbol={orgForm.brandSymbol}
+                    primaryColor={orgForm.brandPrimaryColor}
+                  />
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950 p-4 dark">
+                  <div className="text-[11px] font-medium text-slate-400 mb-2">Dark Surface</div>
+                  <div className="flex items-center gap-2.5">
+                    <BrandSymbol symbol={orgForm.brandSymbol} primaryColor={orgForm.brandPrimaryColor} size={34} />
+                    <div className="min-w-0">
+                      <div className="text-base font-bold tracking-tight text-slate-100 truncate">
+                        {orgForm.name || 'Agency'}
+                      </div>
+                      <div className="text-[11px] text-slate-400 truncate">{orgForm.tagline}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Interface Appearance" description="Saved locally for your workstation">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Color Theme</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                      Current mode: {theme === 'dark' ? 'Dark' : 'Light'}
+                    </div>
+                  </div>
+                  <button type="button" onClick={toggleTheme} className={SECONDARY_BTN}>
+                    {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                    {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                  </button>
+                </div>
+                <label className="flex items-start gap-2.5 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={reducedMotion}
+                    onChange={(e) => setReducedMotion(e.target.checked)}
+                    className="mt-0.5 rounded border-slate-300 dark:border-slate-600"
+                  />
+                  <span>
+                    <strong className="block text-slate-900 dark:text-slate-100">Reduce 3D Motion</strong>
+                    Minimizes subtle active-worker motion in the 3D Virtual HQ for lower CPU usage or motion sensitivity.
+                  </span>
+                </label>
+              </div>
+            </SectionCard>
+          </div>
+        </div>
       </div>
     );
   }
@@ -120,7 +338,7 @@ export function CompanyAndDepartmentsView({ mode }: { mode: 'company' | 'departm
         subtitle={
           mode === 'company'
             ? `${org?.name || 'Agency'} — internal organizational structure combining human leadership with 14 operational AI agents.`
-            : 'Manage internal agency departments and staffing distribution.'
+            : 'Manage internal agency departments, leadership, and click any department to enter its workspace.'
         }
         actions={
           <button type="button" onClick={() => setModalOpen(true)} className={PRIMARY_BTN}>
@@ -140,23 +358,43 @@ export function CompanyAndDepartmentsView({ mode }: { mode: 'company' | 'departm
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto">
         <table className="w-full text-left border-collapse text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-xs font-medium text-slate-600 dark:text-slate-400">
               <th className="py-3 px-4">Department</th>
               <th className="py-3 px-4">Mandate</th>
               <th className="py-3 px-4 text-right">Human Staff</th>
               <th className="py-3 px-4 text-right">AI Agents</th>
+              {onOpenDepartment && <th className="py-3 px-4 text-right">Workspace</th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
             {departments.map((d) => (
-              <tr key={d.id} className="hover:bg-slate-50">
-                <td className="py-3 px-4 font-medium text-slate-900">{d.name}</td>
-                <td className="py-3 px-4 text-xs text-slate-600">{d.description}</td>
-                <td className="py-3 px-4 text-right font-mono tabular-nums">{d.employee_count ?? 0}</td>
-                <td className="py-3 px-4 text-right font-mono tabular-nums">{d.agent_count ?? 0}</td>
+              <tr
+                key={d.id}
+                onClick={onOpenDepartment ? () => onOpenDepartment(d.id) : undefined}
+                className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 ${onOpenDepartment ? 'cursor-pointer' : ''}`}
+              >
+                <td className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">{d.name}</td>
+                <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-400">{d.description}</td>
+                <td className="py-3 px-4 text-right font-mono tabular-nums text-slate-800 dark:text-slate-200">{d.employee_count ?? 0}</td>
+                <td className="py-3 px-4 text-right font-mono tabular-nums text-slate-800 dark:text-slate-200">{d.agent_count ?? 0}</td>
+                {onOpenDepartment && (
+                  <td className="py-3 px-4 text-right">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenDepartment(d.id);
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline"
+                    >
+                      Open
+                      <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -171,7 +409,7 @@ export function CompanyAndDepartmentsView({ mode }: { mode: 'company' | 'departm
           <FormField label="Description" htmlFor="d-desc">
             <textarea id="d-desc" rows={2} value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} className={INPUT_CLASS} />
           </FormField>
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
             <button type="button" onClick={() => setModalOpen(false)} className={SECONDARY_BTN}>Cancel</button>
             <button type="submit" className={PRIMARY_BTN}>Create Department</button>
           </div>
@@ -181,7 +419,13 @@ export function CompanyAndDepartmentsView({ mode }: { mode: 'company' | 'departm
   );
 }
 
-export function EmployeesAndRolesView({ mode }: { mode: 'employees' | 'roles' }) {
+export function EmployeesAndRolesView({
+  mode,
+  onOpenEmployee,
+}: {
+  mode: 'employees' | 'roles';
+  onOpenEmployee?: (employeeId: string) => void;
+}) {
   const [employees, setEmployees] = useState<Array<Record<string, any>>>([]);
   const [departments, setDepartments] = useState<Array<Record<string, any>>>([]);
   const [rolesData, setRolesData] = useState<{ roles: Array<Record<string, any>>; permissions: Array<Record<string, any>> }>({ roles: [], permissions: [] });
@@ -247,7 +491,7 @@ export function EmployeesAndRolesView({ mode }: { mode: 'employees' | 'roles' })
         <div className="space-y-4">
           {rolesData.roles.map((r) => (
             <SectionCard key={r.id} title={r.name} description={`${r.code} · ${r.description}`}>
-              <div className="text-xs font-mono text-slate-700 leading-relaxed">
+              <div className="text-xs font-mono text-slate-700 dark:text-slate-300 leading-relaxed">
                 {(r.permissions as string[]).join(' · ')}
               </div>
             </SectionCard>
@@ -261,7 +505,7 @@ export function EmployeesAndRolesView({ mode }: { mode: 'employees' | 'roles' })
     <div className="space-y-6">
       <PageHeader
         title="Human Employees"
-        subtitle="Internal management and operations team with department assignments and RBAC credentials."
+        subtitle="Internal management and operations team with department assignments, reporting hierarchy, and RBAC credentials."
         actions={
           <button type="button" onClick={() => setModalOpen(true)} className={PRIMARY_BTN}>
             <Plus className="w-4 h-4" aria-hidden="true" />
@@ -271,28 +515,48 @@ export function EmployeesAndRolesView({ mode }: { mode: 'employees' | 'roles' })
       />
       <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto">
         <table className="w-full text-left border-collapse text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-xs font-medium text-slate-600 dark:text-slate-400">
               <th className="py-3 px-4">Employee</th>
               <th className="py-3 px-4">Job Title</th>
               <th className="py-3 px-4">Department</th>
               <th className="py-3 px-4">Assigned Role</th>
               <th className="py-3 px-4">Status</th>
+              {onOpenEmployee && <th className="py-3 px-4 text-right">Profile</th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
             {employees.map((emp) => (
-              <tr key={emp.id} className="hover:bg-slate-50">
+              <tr
+                key={emp.id}
+                onClick={onOpenEmployee ? () => onOpenEmployee(emp.id) : undefined}
+                className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 ${onOpenEmployee ? 'cursor-pointer' : ''}`}
+              >
                 <td className="py-3 px-4">
-                  <div className="font-medium text-slate-900">{emp.full_name}</div>
-                  <div className="text-xs text-slate-500">{emp.email}</div>
+                  <div className="font-medium text-slate-900 dark:text-slate-100">{emp.full_name}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{emp.email}</div>
                 </td>
-                <td className="py-3 px-4 text-xs text-slate-700">{emp.job_title}</td>
-                <td className="py-3 px-4 text-xs text-slate-600">{emp.department_name || '—'}</td>
-                <td className="py-3 px-4 text-xs text-slate-700">{emp.role_names || 'No login account'}</td>
+                <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">{emp.job_title}</td>
+                <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-400">{emp.department_name || '—'}</td>
+                <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">{emp.role_names || 'No login account'}</td>
                 <td className="py-3 px-4"><StatusText status={emp.employment_status} /></td>
+                {onOpenEmployee && (
+                  <td className="py-3 px-4 text-right">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenEmployee(emp.id);
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline"
+                    >
+                      View Profile
+                      <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -675,10 +939,10 @@ export function AuditAndHealthView({ mode }: { mode: 'audit' | 'health' }) {
       {logs.length === 0 ? (
         <EmptyState title="No matching audit entries" description="Audit entries are appended automatically for every state-mutating operation." />
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 font-medium text-slate-600">
+              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 font-medium text-slate-600 dark:text-slate-400">
                 <th className="py-2.5 px-4">Timestamp</th>
                 <th className="py-2.5 px-4">Actor</th>
                 <th className="py-2.5 px-4">Action</th>
@@ -687,15 +951,15 @@ export function AuditAndHealthView({ mode }: { mode: 'audit' | 'health' }) {
                 <th className="py-2.5 px-4">Metadata</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
               {logs.map((l) => (
-                <tr key={l.id} className="hover:bg-slate-50">
-                  <td className="py-2.5 px-4 font-mono text-slate-600 whitespace-nowrap">{formatDateTime(l.created_at)}</td>
-                  <td className="py-2.5 px-4 text-slate-900">{l.actor_label} ({l.actor_type})</td>
-                  <td className="py-2.5 px-4 font-mono text-slate-800">{l.action}</td>
-                  <td className="py-2.5 px-4 font-mono text-slate-600">{l.entity_type}:{l.entity_id}</td>
-                  <td className="py-2.5 px-4 font-mono text-slate-500">{l.correlation_id}</td>
-                  <td className="py-2.5 px-4 font-mono text-slate-500 max-w-xs truncate">{l.metadata_json}</td>
+                <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  <td className="py-2.5 px-4 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">{formatDateTime(l.created_at)}</td>
+                  <td className="py-2.5 px-4 text-slate-900 dark:text-slate-100">{l.actor_label} ({l.actor_type})</td>
+                  <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">{l.action}</td>
+                  <td className="py-2.5 px-4 font-mono text-slate-600 dark:text-slate-400">{l.entity_type}:{l.entity_id}</td>
+                  <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-slate-400">{l.correlation_id}</td>
+                  <td className="py-2.5 px-4 font-mono text-slate-500 dark:text-slate-400 max-w-xs truncate">{l.metadata_json}</td>
                 </tr>
               ))}
             </tbody>

@@ -5,6 +5,7 @@ export interface Migration {
   version: string;
   name: string;
   sql: string;
+  postRun?: (db: DatabaseSync) => void;
 }
 
 export const MIGRATIONS: Migration[] = [
@@ -734,7 +735,147 @@ export const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    version: '002',
+    name: 'company_hq_identity_avatars_meetings',
+    sql: `
+      -- Virtual Meeting Rooms & Multi-Agent Conference Sessions
+      CREATE TABLE IF NOT EXISTS meeting_rooms (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        code TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        room_type TEXT NOT NULL DEFAULT 'department',
+        capacity INTEGER NOT NULL DEFAULT 8,
+        description TEXT NOT NULL DEFAULT '',
+        color_hex TEXT NOT NULL DEFAULT '#1e3a8a',
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS meetings (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        room_id TEXT REFERENCES meeting_rooms(id) ON DELETE SET NULL,
+        title TEXT NOT NULL,
+        meeting_type TEXT NOT NULL DEFAULT 'human_ai_collaboration',
+        agenda TEXT NOT NULL DEFAULT '',
+        client_id TEXT REFERENCES clients(id) ON DELETE SET NULL,
+        project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+        department_id TEXT REFERENCES departments(id) ON DELETE SET NULL,
+        status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled','active','completed','cancelled')),
+        scheduled_for TEXT,
+        started_at TEXT,
+        ended_at TEXT,
+        summary_text TEXT NOT NULL DEFAULT '',
+        created_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_meetings_status ON meetings(status, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS meeting_participants (
+        id TEXT PRIMARY KEY,
+        meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+        participant_type TEXT NOT NULL CHECK (participant_type IN ('human','agent')),
+        participant_id TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        role_title TEXT NOT NULL DEFAULT '',
+        seat_index INTEGER NOT NULL DEFAULT 0,
+        joined_at TEXT NOT NULL,
+        UNIQUE(meeting_id, participant_type, participant_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS meeting_contributions (
+        id TEXT PRIMARY KEY,
+        meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+        participant_type TEXT NOT NULL CHECK (participant_type IN ('human','agent','coordinator')),
+        participant_id TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        contribution_kind TEXT NOT NULL DEFAULT 'message',
+        content TEXT NOT NULL,
+        structured_json TEXT NOT NULL DEFAULT '{}',
+        model_identifier TEXT NOT NULL DEFAULT '',
+        cost_usd REAL NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_meeting_contrib ON meeting_contributions(meeting_id, created_at ASC);
+
+      CREATE TABLE IF NOT EXISTS meeting_decisions (
+        id TEXT PRIMARY KEY,
+        meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        rationale TEXT NOT NULL DEFAULT '',
+        owner_label TEXT NOT NULL DEFAULT '',
+        recorded_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS meeting_action_items (
+        id TEXT PRIMARY KEY,
+        meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        assignee_type TEXT NOT NULL DEFAULT 'agent' CHECK (assignee_type IN ('human','agent')),
+        assignee_id TEXT,
+        assignee_label TEXT NOT NULL DEFAULT 'Unassigned',
+        due_date TEXT,
+        status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','converted','completed','cancelled')),
+        linked_task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+
+      -- Real-Time Company Operational Event Feed (backs SSE /api/events/stream)
+      CREATE TABLE IF NOT EXISTS company_events (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        event_type TEXT NOT NULL,
+        actor_type TEXT NOT NULL CHECK (actor_type IN ('human','agent','system')),
+        actor_id TEXT NOT NULL,
+        actor_label TEXT NOT NULL,
+        department_id TEXT REFERENCES departments(id) ON DELETE SET NULL,
+        entity_type TEXT,
+        entity_id TEXT,
+        summary TEXT NOT NULL,
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_company_events_created ON company_events(created_at DESC);
+    `,
+  },
 ];
+
+function ensureColumn(db: DatabaseSync, table: string, column: string, definition: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+function applyAdditiveColumnsFor002(db: DatabaseSync): void {
+  // Organizations: configurable company brand identity
+  ensureColumn(db, 'organizations', 'tagline', `TEXT NOT NULL DEFAULT 'AI-First Social Media Operations'`);
+  ensureColumn(db, 'organizations', 'brand_primary_color', `TEXT NOT NULL DEFAULT '#1d4ed8'`);
+  ensureColumn(db, 'organizations', 'brand_secondary_color', `TEXT NOT NULL DEFAULT '#0f172a'`);
+  ensureColumn(db, 'organizations', 'brand_symbol', `TEXT NOT NULL DEFAULT 'kestrel'`);
+  ensureColumn(db, 'organizations', 'logo_style', `TEXT NOT NULL DEFAULT 'lockup'`);
+
+  // Departments: operational status, spatial HQ zone code, and visual accent color
+  ensureColumn(db, 'departments', 'status', `TEXT NOT NULL DEFAULT 'active'`);
+  ensureColumn(db, 'departments', 'zone_code', `TEXT NOT NULL DEFAULT ''`);
+  ensureColumn(db, 'departments', 'color_hex', `TEXT NOT NULL DEFAULT '#2563eb'`);
+
+  // Human Employees: full profile & 3D avatar configuration
+  ensureColumn(db, 'employees', 'phone', `TEXT NOT NULL DEFAULT ''`);
+  ensureColumn(db, 'employees', 'photo_url', `TEXT NOT NULL DEFAULT ''`);
+  ensureColumn(db, 'employees', 'joining_date', `TEXT NOT NULL DEFAULT ''`);
+  ensureColumn(db, 'employees', 'avatar_config_json', `TEXT NOT NULL DEFAULT '{}'`);
+  ensureColumn(db, 'employees', 'workstation_code', `TEXT NOT NULL DEFAULT ''`);
+
+  // AI Agents: human manager linkage & 3D avatar configuration
+  ensureColumn(db, 'agents', 'manager_employee_id', `TEXT REFERENCES employees(id) ON DELETE SET NULL`);
+  ensureColumn(db, 'agents', 'avatar_config_json', `TEXT NOT NULL DEFAULT '{}'`);
+  ensureColumn(db, 'agents', 'workstation_code', `TEXT NOT NULL DEFAULT ''`);
+}
 
 export function runMigrations(db: DatabaseSync): { applied: string[] } {
   db.exec(`
@@ -754,6 +895,9 @@ export function runMigrations(db: DatabaseSync): { applied: string[] } {
     db.exec('BEGIN IMMEDIATE');
     try {
       db.exec(migration.sql);
+      if (migration.version === '002') {
+        applyAdditiveColumnsFor002(db);
+      }
       db.prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)').run(
         migration.version,
         migration.name,

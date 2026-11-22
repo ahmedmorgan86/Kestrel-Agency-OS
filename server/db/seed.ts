@@ -362,16 +362,41 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
     ts
   );
 
-  // 2. 11 Core Departments
+  // 2. 13 Core Departments
   const deptIdsByCode = new Map<string, string>();
   const insertDept = db.prepare(`
-    INSERT OR IGNORE INTO departments (id, organization_id, code, name, description, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT OR IGNORE INTO departments (id, organization_id, code, name, description, status, zone_code, color_hex, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+  `);
+  const updateDeptMeta = db.prepare(`
+    UPDATE departments SET zone_code = CASE WHEN zone_code = '' THEN ? ELSE zone_code END,
+                           color_hex = CASE WHEN color_hex = '#2563eb' OR color_hex = '' THEN ? ELSE color_hex END
+    WHERE id = ?
   `);
   for (const dept of DEPARTMENTS) {
     const id = `dept_${dept.code}`;
-    insertDept.run(id, DEFAULT_ORG_ID, dept.code, dept.name, dept.description, ts, ts);
+    insertDept.run(id, DEFAULT_ORG_ID, dept.code, dept.name, dept.description, dept.code, dept.colorHex, ts, ts);
+    updateDeptMeta.run(dept.code, dept.colorHex, id);
     deptIdsByCode.set(dept.code, id);
+  }
+
+  // 2b. 4 Real Virtual Meeting Rooms
+  const insertRoom = db.prepare(`
+    INSERT OR IGNORE INTO meeting_rooms (id, organization_id, code, name, room_type, capacity, description, color_hex, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const room of MEETING_ROOMS) {
+    insertRoom.run(
+      room.id,
+      DEFAULT_ORG_ID,
+      room.code,
+      room.name,
+      room.roomType,
+      room.capacity,
+      room.description,
+      room.colorHex,
+      ts
+    );
   }
 
   // 3. Permissions & Roles

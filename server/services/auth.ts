@@ -171,6 +171,9 @@ export function extractBearerOrCookieToken(req: Request): string | null {
   if (cookieToken && typeof cookieToken === 'string') {
     return cookieToken;
   }
+  if (req.path === '/events/stream' && typeof req.query.token === 'string' && req.query.token.trim()) {
+    return req.query.token.trim();
+  }
   return null;
 }
 

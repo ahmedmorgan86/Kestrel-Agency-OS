@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Activity,
   BarChart3,
@@ -8,6 +8,7 @@ import {
   Building2,
   Calendar,
   CheckSquare,
+  ChevronDown,
   Compass,
   DollarSign,
   FileCheck2,
@@ -21,15 +22,25 @@ import {
   LogOut,
   Megaphone,
   Menu,
+  Moon,
+  Network,
   Palette,
   PenTool,
+  Plus,
+  Search,
   Send,
   Settings,
   ShieldAlert,
+  Sun,
+  UserCheck,
   Users,
+  Video,
   X,
 } from 'lucide-react';
 import { apiRequest, setStoredToken } from './lib/api';
+import { useThemeAndBrand } from './context/ThemeAndBrandContext';
+import { BrandLockup } from './components/BrandMark';
+import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { AuthScreen, type AuthUser } from './views/AuthScreen';
 import { DashboardView, NotificationsView, TaskCenterView } from './views/DashboardAndCommand';
 import {
@@ -56,6 +67,13 @@ import {
   EmployeesAndRolesView,
   IntegrationsView,
 } from './views/OrgAndSystem';
+import { DepartmentWorkspaceView, VirtualHqView } from './views/VirtualHqView';
+import { MeetingsView } from './views/MeetingsView';
+import {
+  AiAgentProfileView,
+  HumanEmployeeProfileView,
+  MyWorkspaceView,
+} from './views/ProfilesAndWorkspace';
 
 interface NavGroup {
   label: string;
@@ -64,9 +82,12 @@ interface NavGroup {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Command',
+    label: 'Headquarters & Command',
     items: [
+      { id: 'hq', label: 'Company HQ', icon: Building2 },
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'workspace', label: 'My Workspace', icon: UserCheck },
+      { id: 'meetings', label: 'Virtual Meetings', icon: Video },
       { id: 'tasks', label: 'Task Center', icon: CheckSquare },
       { id: 'notifications', label: 'Notifications', icon: Bell },
     ],
@@ -109,6 +130,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Organization & System',
     items: [
+      { id: 'orgchart', label: 'Org Chart', icon: Network },
       { id: 'company', label: 'Company Overview', icon: Building2 },
       { id: 'departments', label: 'Departments', icon: Layers },
       { id: 'employees', label: 'Employees', icon: Users },
@@ -116,19 +138,41 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'integrations', label: 'Integrations', icon: Link2 },
       { id: 'audit', label: 'Audit Logs', icon: ShieldAlert },
       { id: 'health', label: 'System Health', icon: Activity },
-      { id: 'settings', label: 'Settings', icon: Settings },
+      { id: 'settings', label: 'Brand & Settings', icon: Settings },
     ],
   },
 ];
 
 const ALL_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 
+type ActiveDetail =
+  | { kind: 'employee'; id: string; returnRoute: string }
+  | { kind: 'agent'; id: string; returnRoute: string }
+  | { kind: 'department'; id: string; returnRoute: string };
+
 export default function App() {
+  const { theme, toggleTheme, brand, updateBrandFromOrg } = useThemeAndBrand();
   const [authLoading, setAuthLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [route, setRoute] = useState('dashboard');
+  const [route, setRoute] = useState('hq');
+  const [activeDetail, setActiveDetail] = useState<ActiveDetail | null>(null);
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const quickCreateRef = useRef<HTMLDivElement | null>(null);
+
+  const loadOrganizationBrand = useCallback(async () => {
+    try {
+      const res = await apiRequest<{ organization?: Record<string, unknown> }>('/organization');
+      if (res.organization) {
+        updateBrandFromOrg(res.organization);
+      }
+    } catch {
+      // ignore brand hydration errors before auth
+    }
+  }, [updateBrandFromOrg]);
 
   const checkAuth = useCallback(async () => {
     setAuthLoading(true);
@@ -138,16 +182,41 @@ export default function App() {
       );
       setInitialized(res.initialized);
       setUser(res.authenticated ? res.user : null);
+      if (res.authenticated) {
+        void loadOrganizationBrand();
+      }
     } catch {
       setUser(null);
     } finally {
       setAuthLoading(false);
     }
-  }, []);
+  }, [loadOrganizationBrand]);
 
   useEffect(() => {
     void checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (!quickCreateOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (quickCreateRef.current && !quickCreateRef.current.contains(e.target as Node)) {
+        setQuickCreateOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [quickCreateOpen]);
 
   const handleLogout = async () => {
     try {
@@ -157,13 +226,15 @@ export default function App() {
     }
     setStoredToken(null);
     setUser(null);
+    setActiveDetail(null);
+    setSelectedMeetingId(null);
     setInitialized(true);
   };
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center text-sm text-slate-600">
-        Loading Kestrel Agency OS...
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-sm text-slate-600 dark:text-slate-400">
+        Loading {brand.name}...
       </div>
     );
   }
@@ -175,23 +246,141 @@ export default function App() {
         onAuthenticated={(u) => {
           setUser(u);
           setInitialized(true);
-          setRoute('dashboard');
+          setRoute('hq');
+          void loadOrganizationBrand();
         }}
       />
     );
   }
 
-  const activeNav = ALL_ITEMS.find((i) => i.id === route) ?? ALL_ITEMS[0];
-
   const navigate = (nextRoute: string) => {
     setRoute(nextRoute);
+    setActiveDetail(null);
+    if (nextRoute !== 'meetings') {
+      setSelectedMeetingId(null);
+    }
+    setMobileMenuOpen(false);
+    setQuickCreateOpen(false);
+  };
+
+  const openEmployee = (employeeId: string) => {
+    setActiveDetail({ kind: 'employee', id: employeeId, returnRoute: route });
     setMobileMenuOpen(false);
   };
 
+  const openAgent = (agentId: string) => {
+    setActiveDetail({ kind: 'agent', id: agentId, returnRoute: route });
+    setMobileMenuOpen(false);
+  };
+
+  const openDepartment = (departmentId: string) => {
+    setActiveDetail({ kind: 'department', id: departmentId, returnRoute: route });
+    setMobileMenuOpen(false);
+  };
+
+  const openMeeting = (meetingId?: string) => {
+    setActiveDetail(null);
+    setSelectedMeetingId(meetingId ?? null);
+    setRoute('meetings');
+    setMobileMenuOpen(false);
+  };
+
+  const activeNav = ALL_ITEMS.find((i) => i.id === route) ?? ALL_ITEMS[0];
+
+  const detailBreadcrumb = activeDetail
+    ? activeDetail.kind === 'employee'
+      ? 'Employee Profile'
+      : activeDetail.kind === 'agent'
+      ? 'AI Agent Profile'
+      : 'Department Workspace'
+    : null;
+
   const renderView = () => {
+    if (activeDetail) {
+      if (activeDetail.kind === 'employee') {
+        return (
+          <HumanEmployeeProfileView
+            employeeId={activeDetail.id}
+            onBack={() => setActiveDetail(null)}
+            onOpenEmployee={openEmployee}
+            onOpenAgent={openAgent}
+            onOpenDepartment={openDepartment}
+          />
+        );
+      }
+      if (activeDetail.kind === 'agent') {
+        return (
+          <AiAgentProfileView
+            agentId={activeDetail.id}
+            onBack={() => setActiveDetail(null)}
+            onOpenDepartment={openDepartment}
+            onOpenEmployee={openEmployee}
+          />
+        );
+      }
+      if (activeDetail.kind === 'department') {
+        return (
+          <DepartmentWorkspaceView
+            departmentId={activeDetail.id}
+            onBack={() => setActiveDetail(null)}
+            onOpenEmployee={openEmployee}
+            onOpenAgent={openAgent}
+            onOpenMeeting={openMeeting}
+            onNavigate={navigate}
+          />
+        );
+      }
+    }
+
     switch (route) {
+      case 'hq':
+        return (
+          <VirtualHqView
+            key="hq-3d"
+            initialTab="hq3d"
+            onOpenEmployee={openEmployee}
+            onOpenAgent={openAgent}
+            onOpenDepartment={openDepartment}
+            onOpenMeeting={openMeeting}
+            onNavigate={navigate}
+          />
+        );
+      case 'orgchart':
+        return (
+          <VirtualHqView
+            key="hq-orgchart"
+            initialTab="orgchart"
+            onOpenEmployee={openEmployee}
+            onOpenAgent={openAgent}
+            onOpenDepartment={openDepartment}
+            onOpenMeeting={openMeeting}
+            onNavigate={navigate}
+          />
+        );
+      case 'workspace':
+        return (
+          <MyWorkspaceView
+            onNavigate={navigate}
+            onOpenMeeting={openMeeting}
+            onOpenEmployee={openEmployee}
+          />
+        );
+      case 'meetings':
+        return (
+          <MeetingsView
+            key={selectedMeetingId || 'meetings-list'}
+            initialMeetingId={selectedMeetingId}
+            onNavigate={navigate}
+          />
+        );
       case 'dashboard':
-        return <DashboardView onNavigate={navigate} />;
+        return (
+          <DashboardView
+            onNavigate={navigate}
+            onOpenAgent={openAgent}
+            onOpenMeeting={openMeeting}
+          />
+        );
       case 'tasks':
         return <TaskCenterView />;
       case 'notifications':
@@ -219,7 +408,7 @@ export default function App() {
       case 'publishing':
         return <PublishingCenterView />;
       case 'agents':
-        return <AgentWorkforceView />;
+        return <AgentWorkforceView onOpenAgent={openAgent} />;
       case 'executions':
         return <ExecutionHistoryView />;
       case 'analytics':
@@ -227,11 +416,26 @@ export default function App() {
       case 'finance':
         return <FinancialManagementView />;
       case 'company':
-        return <CompanyAndDepartmentsView mode="company" />;
+        return (
+          <CompanyAndDepartmentsView
+            mode="company"
+            onOpenDepartment={openDepartment}
+          />
+        );
       case 'departments':
-        return <CompanyAndDepartmentsView mode="departments" />;
+        return (
+          <CompanyAndDepartmentsView
+            mode="departments"
+            onOpenDepartment={openDepartment}
+          />
+        );
       case 'employees':
-        return <EmployeesAndRolesView mode="employees" />;
+        return (
+          <EmployeesAndRolesView
+            mode="employees"
+            onOpenEmployee={openEmployee}
+          />
+        );
       case 'roles':
         return <EmployeesAndRolesView mode="roles" />;
       case 'integrations':
@@ -243,21 +447,46 @@ export default function App() {
       case 'settings':
         return <CompanyAndDepartmentsView mode="settings" />;
       default:
-        return <DashboardView onNavigate={navigate} />;
+        return (
+          <VirtualHqView
+            initialTab="hq3d"
+            onOpenEmployee={openEmployee}
+            onOpenAgent={openAgent}
+            onOpenDepartment={openDepartment}
+            onOpenMeeting={openMeeting}
+            onNavigate={navigate}
+          />
+        );
     }
   };
 
+  const initials = user.fullName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || '')
+    .join('');
+
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-white border-r border-slate-200">
-      <div className="h-14 px-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-        <span className="text-base font-bold tracking-tight text-slate-900 font-[var(--font-display)] whitespace-nowrap">
-          Kestrel Agency OS
-        </span>
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
+      <div className="h-14 px-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={() => navigate('hq')}
+          className="text-left min-w-0 focus:outline-none"
+        >
+          <BrandLockup
+            name={brand.name}
+            tagline={brand.tagline}
+            symbol={brand.symbol}
+            primaryColor={brand.primaryColor}
+            variant="compact"
+          />
+        </button>
         <button
           type="button"
           onClick={() => setMobileMenuOpen(false)}
           aria-label="Close navigation menu"
-          className="lg:hidden p-1 text-slate-500 hover:text-slate-900"
+          className="lg:hidden p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 shrink-0"
         >
           <X className="w-5 h-5" />
         </button>
@@ -266,13 +495,13 @@ export default function App() {
       <nav aria-label="Primary workspace navigation" className="flex-1 overflow-y-auto py-3 px-2.5 space-y-5">
         {NAV_GROUPS.map((group) => (
           <div key={group.label}>
-            <div className="px-2.5 pb-1.5 text-[11px] font-semibold text-slate-400">
+            <div className="px-2.5 pb-1.5 text-[11px] font-semibold tracking-wide text-slate-400 dark:text-slate-500">
               {group.label}
             </div>
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = route === item.id;
+                const active = !activeDetail && route === item.id;
                 return (
                   <button
                     key={item.id}
@@ -281,8 +510,8 @@ export default function App() {
                     aria-current={active ? 'page' : undefined}
                     className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                       active
-                        ? 'bg-blue-50 text-blue-800'
-                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                        ? 'bg-blue-50 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -295,13 +524,31 @@ export default function App() {
         ))}
       </nav>
 
-      <div className="p-3 border-t border-slate-200 shrink-0">
-        <div className="text-xs font-medium text-slate-900 truncate">{user.fullName}</div>
-        <div className="text-[11px] text-slate-500 truncate">{user.email}</div>
+      <div className="p-3 border-t border-slate-200 dark:border-slate-800 shrink-0 space-y-2.5">
+        <button
+          type="button"
+          onClick={() => navigate('workspace')}
+          className="w-full flex items-center gap-2.5 rounded-md p-1.5 -m-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left"
+        >
+          <div
+            className="w-8 h-8 rounded-md flex items-center justify-center text-xs font-semibold text-white shrink-0"
+            style={{ backgroundColor: brand.primaryColor }}
+          >
+            {initials || 'OP'}
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-slate-900 dark:text-slate-100 truncate">
+              {user.fullName}
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              {user.email}
+            </div>
+          </div>
+        </button>
         <button
           type="button"
           onClick={handleLogout}
-          className="mt-2.5 w-full flex items-center justify-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          className="w-full flex items-center justify-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
         >
           <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
           Sign Out
@@ -311,7 +558,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-60 shrink-0 sticky top-0 h-screen">
         {sidebarContent}
@@ -324,7 +571,7 @@ export default function App() {
           <button
             type="button"
             aria-label="Dismiss navigation backdrop"
-            className="flex-1 bg-slate-900/40"
+            className="flex-1 bg-slate-950/50"
             onClick={() => setMobileMenuOpen(false)}
           />
         </div>
@@ -332,45 +579,142 @@ export default function App() {
 
       {/* Main Content Shell */}
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between gap-4 sticky top-0 z-30">
+        <header className="h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-30">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Open navigation menu"
-              className="lg:hidden p-1.5 text-slate-600 hover:text-slate-900 rounded-md"
+              className="lg:hidden p-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-md"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="text-sm text-slate-500 truncate">
-              <span className="hidden sm:inline">Agency OS</span>
-              <span className="hidden sm:inline mx-2 text-slate-300">/</span>
-              <span className="font-medium text-slate-900">{activeNav.label}</span>
+            <div className="text-sm text-slate-500 dark:text-slate-400 truncate flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => navigate('hq')}
+                className="hidden sm:inline hover:text-slate-900 dark:hover:text-slate-100 truncate"
+              >
+                {brand.name}
+              </button>
+              <span className="hidden sm:inline text-slate-300 dark:text-slate-600">/</span>
+              <button
+                type="button"
+                onClick={() => setActiveDetail(null)}
+                className={`truncate ${
+                  detailBreadcrumb
+                    ? 'hover:text-slate-900 dark:hover:text-slate-100'
+                    : 'font-medium text-slate-900 dark:text-slate-100'
+                }`}
+              >
+                {activeNav.label}
+              </button>
+              {detailBreadcrumb && (
+                <>
+                  <span className="text-slate-300 dark:text-slate-600">/</span>
+                  <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                    {detailBreadcrumb}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Global search"
+              className="inline-flex items-center gap-2 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Search className="w-3.5 h-3.5" aria-hidden="true" />
+              <span className="hidden md:inline">Search workspace...</span>
+              <kbd className="hidden md:inline-block rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-1 py-0.5 text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                ⌘K
+              </kbd>
+            </button>
+
+            <div className="relative" ref={quickCreateRef}>
+              <button
+                type="button"
+                onClick={() => setQuickCreateOpen((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-blue-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-800 whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                <span className="hidden sm:inline">Quick Create</span>
+                <ChevronDown className="w-3 h-3" aria-hidden="true" />
+              </button>
+              {quickCreateOpen && (
+                <div className="absolute right-0 mt-1.5 w-52 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-1 z-50">
+                  {[
+                    { label: 'New Virtual Meeting', route: 'meetings', icon: Video },
+                    { label: 'New Operational Task', route: 'tasks', icon: CheckSquare },
+                    { label: 'New Content Draft', route: 'content', icon: PenTool },
+                    { label: 'New Client Account', route: 'clients', icon: Briefcase },
+                    { label: 'Add Human Employee', route: 'employees', icon: Users },
+                    { label: 'Add Department', route: 'departments', icon: Layers },
+                  ].map((act) => {
+                    const ActIcon = act.icon;
+                    return (
+                      <button
+                        key={act.route}
+                        type="button"
+                        onClick={() => navigate(act.route)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
+                      >
+                        <ActIcon className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                        {act.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={() => navigate('approvals')}
-              className="hidden sm:inline-flex text-xs font-medium text-slate-700 hover:text-slate-900 whitespace-nowrap shrink-0"
+              className="hidden xl:inline-flex items-center gap-1.5 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 whitespace-nowrap"
             >
+              <FileCheck2 className="w-3.5 h-3.5" aria-hidden="true" />
               Approvals
             </button>
+
             <button
               type="button"
-              onClick={() => navigate('content')}
-              className="rounded-md bg-blue-700 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-blue-800 whitespace-nowrap shrink-0"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              className="inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
-              Content Studio
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1480px] w-full mx-auto">
           {renderView()}
         </main>
       </div>
+
+      <GlobalSearchModal
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onSelectResult={(result) => {
+          setSearchOpen(false);
+          if (result.type === 'employee' && result.entityId) {
+            openEmployee(result.entityId);
+          } else if (result.type === 'agent' && result.entityId) {
+            openAgent(result.entityId);
+          } else if (result.type === 'department' && result.entityId) {
+            openDepartment(result.entityId);
+          } else if (result.type === 'meeting' && result.entityId) {
+            openMeeting(result.entityId);
+          } else {
+            navigate(result.route || 'dashboard');
+          }
+        }}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { canAgentInvokeTool, wrapUntrustedContentForAgent } from '../../src/doma
 import { generateStructuredText } from './aiProviders';
 import { executePlatformPublish, fetchPlatformAnalytics, type SocialPlatform } from './socialAdapters';
 import { createNotification, recordSystemEvent, writeAuditLog } from './audit';
+import { broadcastCompanyEvent } from './realtime';
 import { generateId, logStructured } from './security';
 
 const WORKER_ID = `worker_${process.pid}_${Math.random().toString(36).slice(2, 8)}`;
@@ -248,6 +249,18 @@ async function handleAgentTaskJob(jobId: string, correlationId: string, payload:
     ts
   );
 
+  broadcastCompanyEvent(db, {
+    eventType: 'agent.task_started',
+    actorType: 'agent',
+    actorId: agentId,
+    actorLabel: String(agent.name),
+    departmentId: (agent.department_id as string | null) ?? null,
+    entityType: 'task_run',
+    entityId: runId,
+    summary: `${String(agent.name)} started executing "${String(task?.title || payload.title || 'Ad-hoc task')}"`,
+    payload: { taskId: task ? taskId : null, runId, model: String(agent.model_identifier) },
+  });
+
   try {
     const result = await generateStructuredText({
       provider: String(agent.model_provider),
@@ -385,6 +398,18 @@ async function handleAgentTaskJob(jobId: string, correlationId: string, payload:
       },
     });
 
+    broadcastCompanyEvent(db, {
+      eventType: 'agent.task_completed',
+      actorType: 'agent',
+      actorId: agentId,
+      actorLabel: String(agent.name),
+      departmentId: (agent.department_id as string | null) ?? null,
+      entityType: 'task_run',
+      entityId: runId,
+      summary: `${String(agent.name)} completed "${String(task?.title || payload.title || 'Ad-hoc task')}" (${result.latencyMs}ms)`,
+      payload: { taskId: task ? taskId : null, runId, costUsd: result.costUsd, latencyMs: result.latencyMs },
+    });
+
     return { runId, status: 'completed', costUsd: result.costUsd, latencyMs: result.latencyMs };
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -412,6 +437,17 @@ async function handleAgentTaskJob(jobId: string, correlationId: string, payload:
       entityType: 'task_run',
       entityId: runId,
       metadata: { error: errMsg },
+    });
+    broadcastCompanyEvent(db, {
+      eventType: 'agent.task_failed',
+      actorType: 'agent',
+      actorId: agentId,
+      actorLabel: String(agent.name),
+      departmentId: (agent.department_id as string | null) ?? null,
+      entityType: 'task_run',
+      entityId: runId,
+      summary: `${String(agent.name)} execution failed: ${errMsg.slice(0, 140)}`,
+      payload: { taskId: task ? taskId : null, runId, error: errMsg.slice(0, 200) },
     });
     throw err;
   }

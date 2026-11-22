@@ -18,7 +18,11 @@ import {
   formatShortDate,
 } from '../components/ui';
 
-export function AgentWorkforceView() {
+export function AgentWorkforceView({
+  onOpenAgent,
+}: {
+  onOpenAgent?: (agentId: string) => void;
+} = {}) {
   const [agents, setAgents] = useState<Array<Record<string, any>>>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<Record<string, any> | null>(null);
@@ -267,42 +271,50 @@ export function AgentWorkforceView() {
       />
       <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-x-auto">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-x-auto">
         <table className="w-full text-left border-collapse text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-600">
+            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-xs font-medium text-slate-600 dark:text-slate-400">
               <th className="py-3 px-4">Agent & Role</th>
               <th className="py-3 px-4">Department</th>
               <th className="py-3 px-4">Model</th>
               <th className="py-3 px-4 text-right">Runs (OK / Fail)</th>
               <th className="py-3 px-4 text-right">Recorded Cost</th>
               <th className="py-3 px-4">Status</th>
-              <th className="py-3 px-4 text-right">Configure</th>
+              <th className="py-3 px-4 text-right">Profile</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
             {agents.map((a) => (
-              <tr key={a.id} className="hover:bg-slate-50">
+              <tr
+                key={a.id}
+                onClick={() => (onOpenAgent ? onOpenAgent(a.id) : setSelectedId(a.id))}
+                className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer"
+              >
                 <td className="py-3 px-4">
-                  <div className="font-medium text-slate-900">{a.name}</div>
-                  <div className="text-xs text-slate-500">{a.job_title} · v{a.prompt_version}</div>
+                  <div className="font-medium text-slate-900 dark:text-slate-100">{a.name}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">{a.job_title} · v{a.prompt_version}</div>
                 </td>
-                <td className="py-3 px-4 text-xs text-slate-600">{a.department_name || '—'}</td>
-                <td className="py-3 px-4 font-mono text-xs text-slate-700">{a.model_identifier}</td>
-                <td className="py-3 px-4 text-right font-mono text-xs tabular-nums">
-                  {a.completed_runs} / <span className={a.failed_runs > 0 ? 'text-red-700' : ''}>{a.failed_runs}</span>
+                <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-400">{a.department_name || '—'}</td>
+                <td className="py-3 px-4 font-mono text-xs text-slate-700 dark:text-slate-300">{a.model_identifier}</td>
+                <td className="py-3 px-4 text-right font-mono text-xs tabular-nums text-slate-800 dark:text-slate-200">
+                  {a.completed_runs} / <span className={a.failed_runs > 0 ? 'text-red-700 dark:text-red-400' : ''}>{a.failed_runs}</span>
                 </td>
-                <td className="py-3 px-4 text-right font-mono text-xs tabular-nums">
+                <td className="py-3 px-4 text-right font-mono text-xs tabular-nums text-slate-800 dark:text-slate-200">
                   ${Number(a.total_cost_usd || 0).toFixed(4)}
                 </td>
                 <td className="py-3 px-4"><StatusText status={a.status} /></td>
                 <td className="py-3 px-4 text-right">
                   <button
                     type="button"
-                    onClick={() => setSelectedId(a.id)}
-                    className="text-xs font-medium text-blue-700 hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onOpenAgent) onOpenAgent(a.id);
+                      else setSelectedId(a.id);
+                    }}
+                    className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline"
                   >
-                    Inspect & Run
+                    Open 9-Tab Profile
                   </button>
                 </td>
               </tr>
