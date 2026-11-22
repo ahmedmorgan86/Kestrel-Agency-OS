@@ -58,11 +58,12 @@ interface CameraPreset {
 }
 
 const CAMERA_PRESETS: CameraPreset[] = [
-  { id: 'overview', label: 'HQ Overview', pos: [0, 24, 40], target: [0, 0.4, 2] },
-  { id: 'reception', label: 'Reception', pos: [0, 9.5, 31], target: [0, 1.2, 20.5] },
-  { id: 'executive', label: 'Executive', pos: [0, 12, -2], target: [0, 1, -15] },
-  { id: 'creative', label: 'Creative Wing', pos: [-16, 13, 15], target: [-6, 0.8, 3] },
-  { id: 'meetings', label: 'Boardrooms', pos: [-22, 13, -3], target: [-15, 0.8, -15] },
+  { id: 'atrium', label: 'Atrium', pos: [0, 8, 7], target: [0, 1.35, 22] },
+  { id: 'overview', label: 'Full HQ', pos: [0, 18, 43], target: [0, 1.1, 2] },
+  { id: 'reception', label: 'Reception', pos: [0, 7, 34], target: [0, 1.2, 19] },
+  { id: 'executive', label: 'Executive', pos: [0, 8, 4], target: [0, 1.4, -15] },
+  { id: 'creative', label: 'Product Studio', pos: [-14, 8.5, 17], target: [-6, 1, 3] },
+  { id: 'meetings', label: 'Boardrooms', pos: [-19, 8.5, -2], target: [-15, 1, -15] },
 ];
 
 const STATUS_COLORS: Record<OperationalStatus, number> = {
@@ -123,28 +124,87 @@ function makeFloorGridTexture(dark: boolean, anisotropy: number): THREE.CanvasTe
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = dark ? '#111827' : '#edf1f7';
+    ctx.fillStyle = dark ? '#252a30' : '#82786c';
     ctx.fillRect(0, 0, 512, 512);
-    ctx.strokeStyle = dark ? '#1e293b' : '#dde4ee';
-    ctx.lineWidth = 2;
-    for (let i = 0; i <= 512; i += 64) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, 512);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(512, i);
-      ctx.stroke();
+    for (let row = 0; row < 4; row += 1) {
+      for (let col = 0; col < 4; col += 1) {
+        const shade = (row * 7 + col * 11) % 9;
+        ctx.fillStyle = dark ? `rgba(255,255,255,${0.008 + shade * 0.001})` : `rgba(255,255,255,${0.008 + shade * 0.001})`;
+        ctx.fillRect(col * 128 + 2, row * 128 + 2, 124, 124);
+        ctx.strokeStyle = dark ? 'rgba(180,195,205,0.14)' : 'rgba(99,83,65,0.18)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(col * 128 + 1, row * 128 + 1, 126, 126);
+        ctx.strokeStyle = dark ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.18)';
+        ctx.beginPath();
+        ctx.moveTo(col * 128 + 14, row * 128 + 88 + (shade % 3) * 8);
+        ctx.lineTo(col * 128 + 74, row * 128 + 84 + (shade % 3) * 8);
+        ctx.lineTo(col * 128 + 116, row * 128 + 89 + (shade % 3) * 8);
+        ctx.stroke();
+      }
     }
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(14, 12);
+  tex.repeat.set(3.8, 3.6);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = anisotropy;
   return tex;
+}
+
+function makeCityBackdropTexture(anisotropy: number): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2048;
+  canvas.height = 768;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    sky.addColorStop(0, '#162536');
+    sky.addColorStop(0.48, '#405365');
+    sky.addColorStop(0.78, '#a19f93');
+    sky.addColorStop(1, '#49545a');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Layered silhouettes and warm office windows suggest an inhabited city beyond the glass facade.
+    const drawLayer = (seed: number, baseY: number, baseColor: string, minWidth: number, maxWidth: number, minHeight: number, maxHeight: number, windowAlpha: number) => {
+      let x = -12;
+      let index = 0;
+      while (x < canvas.width + 24) {
+        const wave = Math.abs(Math.sin(seed + index * 12.9898));
+        const width = minWidth + Math.floor(wave * (maxWidth - minWidth));
+        const height = minHeight + Math.floor(Math.abs(Math.sin(seed + index * 7.13)) * (maxHeight - minHeight));
+        ctx.fillStyle = baseColor;
+        ctx.fillRect(x, baseY - height, width, height + 4);
+        if (width > 24) {
+          for (let wx = x + 8; wx < x + width - 5; wx += 15) {
+            for (let wy = baseY - height + 12; wy < baseY - 8; wy += 19) {
+              const lit = Math.abs(Math.sin(wx * 0.03 + wy * 0.017 + seed));
+              if (lit > 0.44) {
+                ctx.fillStyle = `rgba(255,211,145,${windowAlpha * lit})`;
+                ctx.fillRect(wx, wy, 5, 8);
+              }
+            }
+          }
+        }
+        x += width + 4;
+        index += 1;
+      }
+    };
+    drawLayer(1.8, 594, '#59666b', 28, 92, 90, 250, 0.28);
+    drawLayer(8.4, 672, '#303b43', 38, 128, 135, 360, 0.62);
+    ctx.fillStyle = '#27343b';
+    ctx.fillRect(0, 666, canvas.width, 102);
+    const horizon = ctx.createLinearGradient(0, 640, 0, 768);
+    horizon.addColorStop(0, 'rgba(226,179,113,0)');
+    horizon.addColorStop(1, 'rgba(230,189,136,0.3)');
+    ctx.fillStyle = horizon;
+    ctx.fillRect(0, 640, canvas.width, 128);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = anisotropy;
+  return texture;
 }
 
 function buildWorkstationGroup(
@@ -160,9 +220,9 @@ function buildWorkstationGroup(
   group.rotation.y = rotY;
 
   const deskTopMat = new THREE.MeshStandardMaterial({
-    color: dark ? 0x1e293b : 0xf8fafc,
-    roughness: 0.45,
-    metalness: 0.08,
+    color: dark ? 0x382f28 : 0x8a7055,
+    roughness: 0.62,
+    metalness: 0.04,
   });
   const legMat = new THREE.MeshStandardMaterial({
     color: dark ? 0x334155 : 0x475569,
@@ -223,7 +283,7 @@ function buildWorkstationGroup(
 
   // Ergonomic Chair behind desk
   const chairMat = new THREE.MeshStandardMaterial({
-    color: dark ? 0x334155 : 0x64748b,
+    color: dark ? 0x202b36 : 0x2b343b,
     roughness: 0.65,
     metalness: 0.1,
   });
@@ -430,8 +490,8 @@ export function VirtualHq3D({
     target: THREE.Vector3;
     active: boolean;
   }>({
-    pos: new THREE.Vector3(0, 24, 40),
-    target: new THREE.Vector3(0, 0.4, 2),
+    pos: new THREE.Vector3(0, 18, 43),
+    target: new THREE.Vector3(0, 1.1, 2),
     active: false,
   });
 
@@ -499,7 +559,7 @@ export function VirtualHq3D({
     renderer.domElement.style.height = '100%';
 
     const isDark = theme === 'dark';
-    const bgColor = isDark ? 0x0b1220 : 0xe8eef6;
+    const bgColor = isDark ? 0x10161d : 0x202934;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(bgColor);
@@ -510,13 +570,13 @@ export function VirtualHq3D({
     const envTarget = pmrem.fromScene(new RoomEnvironment(), 0.04);
     scene.environment = envTarget.texture;
 
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.25, 220);
-    camera.position.set(0, 24, 40);
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.25, 220);
+    camera.position.set(0, 18, 43);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
-    controls.target.set(0, 0.4, 2);
+    controls.target.set(0, 1.1, 2);
     controls.minDistance = 8;
     controls.maxDistance = 68;
     controls.maxPolarAngle = Math.PI * 0.46;
@@ -524,29 +584,36 @@ export function VirtualHq3D({
     controls.update();
 
     // Architectural studio three-point lighting
-    const hemi = new THREE.HemisphereLight(isDark ? 0x93c5fd : 0xf8fafc, isDark ? 0x1e293b : 0xcbd5e1, isDark ? 0.72 : 0.95);
+    const hemi = new THREE.HemisphereLight(isDark ? 0x9bb7d0 : 0xe6eff6, isDark ? 0x11161c : 0x6b655c, isDark ? 0.8 : 0.72);
     scene.add(hemi);
 
-    const keyLight = new THREE.DirectionalLight(0xfff7ed, isDark ? 1.25 : 1.5);
-    keyLight.position.set(22, 34, 24);
+    const keyLight = new THREE.DirectionalLight(0xffe1bd, isDark ? 2.1 : 1.65);
+    keyLight.position.set(14, 28, 30);
     if (!isSoftwareGl) {
       keyLight.castShadow = true;
       keyLight.shadow.mapSize.width = 2048;
       keyLight.shadow.mapSize.height = 2048;
       keyLight.shadow.camera.near = 4;
       keyLight.shadow.camera.far = 95;
-      keyLight.shadow.camera.left = -32;
-      keyLight.shadow.camera.right = 32;
-      keyLight.shadow.camera.top = 32;
-      keyLight.shadow.camera.bottom = -32;
+      keyLight.shadow.camera.left = -28;
+      keyLight.shadow.camera.right = 28;
+      keyLight.shadow.camera.top = 30;
+      keyLight.shadow.camera.bottom = -30;
       keyLight.shadow.bias = -0.0004;
       keyLight.shadow.normalBias = 0.02;
     }
     scene.add(keyLight);
 
-    const fillLight = new THREE.DirectionalLight(0xdbeafe, isDark ? 0.45 : 0.55);
-    fillLight.position.set(-24, 18, -18);
+    const fillLight = new THREE.DirectionalLight(0xb9d8ed, isDark ? 0.72 : 0.48);
+    fillLight.position.set(-25, 18, -12);
     scene.add(fillLight);
+
+    const atriumLight = new THREE.PointLight(0xffc98f, isDark ? 4.5 : 2.8, 30, 2);
+    atriumLight.position.set(0, 3.4, 15);
+    scene.add(atriumLight);
+    const studioLight = new THREE.PointLight(0x8ed8e0, isDark ? 2.6 : 1.6, 24, 2);
+    studioLight.position.set(-8, 3.1, 0);
+    scene.add(studioLight);
 
     const disposableTextures: THREE.Texture[] = [];
     const interactables: THREE.Object3D[] = [];
@@ -567,6 +634,14 @@ export function VirtualHq3D({
     floorPlate.receiveShadow = true;
     scene.add(floorPlate);
 
+    const foundation = new THREE.Mesh(
+      new THREE.BoxGeometry(52.8, 0.52, 50.8),
+      new THREE.MeshStandardMaterial({ color: isDark ? 0x111923 : 0x4c5053, roughness: 0.42, metalness: 0.34 })
+    );
+    foundation.position.set(0, -0.58, 3);
+    foundation.receiveShadow = true;
+    scene.add(foundation);
+
     // Outer perimeter architectural plinth & low glass balustrade
     const plinthMat = new THREE.MeshStandardMaterial({
       color: isDark ? 0x1e293b : 0xcbd5e1,
@@ -586,6 +661,62 @@ export function VirtualHq3D({
       column.castShadow = !isSoftwareGl;
       scene.add(column);
     }
+    const facadeGlass = new THREE.MeshPhysicalMaterial({
+      color: isDark ? 0x658394 : 0x99b5c0,
+      transparent: true,
+      opacity: 0.22,
+      roughness: 0.16,
+      metalness: 0.18,
+      transmission: 0.12,
+      thickness: 0.12,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const facadeRailMat = new THREE.MeshStandardMaterial({ color: isDark ? 0x26343d : 0x56616a, metalness: 0.78, roughness: 0.24 });
+    // Full height glazed entrance wall with evenly spaced mullions.
+    for (let bay = 0; bay < 4; bay += 1) {
+      const centerX = -18.6 + bay * 12.4;
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(12.1, 3.58, 0.07), facadeGlass);
+      pane.position.set(centerX, 2.03, 27.55);
+      scene.add(pane);
+      for (const localX of [-5.95, -3, 0, 3, 5.95]) {
+        const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.055, 3.75, 0.13), facadeRailMat);
+        mullion.position.set(centerX + localX, 1.96, 27.5);
+        scene.add(mullion);
+      }
+    }
+    for (const y of [0.2, 3.8]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(49.8, 0.12, 0.16), facadeRailMat);
+      rail.position.set(0, y, 27.5);
+      scene.add(rail);
+    }
+
+    // Wraparound glass at the two long elevations; dark steel rails add real architectural depth.
+    for (const side of [-1, 1]) {
+      const sideGlass = new THREE.Mesh(new THREE.BoxGeometry(0.07, 3.55, 49), facadeGlass);
+      sideGlass.position.set(side * 25.65, 2, 3);
+      scene.add(sideGlass);
+      for (let bay = 0; bay <= 8; bay += 1) {
+        const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.14, 3.8, 0.13), facadeRailMat);
+        mullion.position.set(side * 25.62, 1.95, -21.5 + bay * 6.1);
+        scene.add(mullion);
+      }
+      for (const y of [0.2, 3.8]) {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 49.7), facadeRailMat);
+        rail.position.set(side * 25.62, y, 3);
+        scene.add(rail);
+      }
+    }
+    const cityTexture = makeCityBackdropTexture(maxAnisotropy);
+    disposableTextures.push(cityTexture);
+    const skyline = new THREE.Mesh(
+      new THREE.PlaneGeometry(210, 74),
+      new THREE.MeshBasicMaterial({ map: cityTexture, side: THREE.DoubleSide, toneMapped: false })
+    );
+    skyline.position.set(0, 19, 65);
+    skyline.rotation.y = Math.PI;
+    scene.add(skyline);
+
     const planterMat = new THREE.MeshStandardMaterial({ color: isDark ? 0x1e293b : 0x475569, roughness: 0.72 });
     const leafMat = new THREE.MeshStandardMaterial({ color: isDark ? 0x16a085 : 0x238b70, roughness: 0.82 });
     for (const [x, z] of [[-22, 24], [22, 24], [-23, -18], [23, -18]] as const) {
@@ -671,15 +802,15 @@ export function VirtualHq3D({
     for (const zone of zones) {
       const isSelected = selectedId === zone.id;
       const zoneColor = new THREE.Color(zone.colorHex || '#2563eb');
-      const padColor = isDark ? 0x162033 : 0xf8fafc;
+      const padColor = isDark ? 0x202832 : 0xb2a28e;
 
       // Zone carpet/floor pad at y = 0.03 (clean Y-offset above floor y=0)
       const pad = new THREE.Mesh(
         new THREE.BoxGeometry(zone.width, 0.06, zone.depth),
         new THREE.MeshStandardMaterial({
           color: isSelected ? zoneColor : padColor,
-          roughness: 0.85,
-          metalness: 0.02,
+          roughness: 0.94,
+          metalness: 0.01,
         })
       );
       pad.position.set(zone.x, 0.03, zone.z);
@@ -694,15 +825,15 @@ export function VirtualHq3D({
 
       // Colored front border bar at y = 0.065
       const accentBar = new THREE.Mesh(
-        new THREE.BoxGeometry(zone.width, 0.03, 0.22),
+        new THREE.BoxGeometry(zone.width, 0.025, 0.09),
         new THREE.MeshStandardMaterial({
-          color: zoneColor,
+          color: zoneColor.clone().lerp(new THREE.Color(isDark ? 0x34434a : 0x8c7860), 0.58),
           emissive: zoneColor,
-          emissiveIntensity: isSelected ? 0.45 : 0.12,
+          emissiveIntensity: isSelected ? 0.22 : 0.035,
           roughness: 0.4,
         })
       );
-      accentBar.position.set(zone.x, 0.065, zone.z + zone.depth / 2 - 0.11);
+      accentBar.position.set(zone.x, 0.065, zone.z + zone.depth / 2 - 0.045);
       scene.add(accentBar);
 
       // Zone Signage Plaque
@@ -723,29 +854,102 @@ export function VirtualHq3D({
       const signTex = makeSignTexture(zone.name, signSub, zone.colorHex, isDark, maxAnisotropy);
       disposableTextures.push(signTex);
       const signMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(Math.min(4.8, zone.width - 1), 1.05),
+        new THREE.PlaneGeometry(Math.min(3.2, zone.width - 1), 1),
         new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.35 })
       );
-      signMesh.position.set(zone.x, 0.08, zone.z + zone.depth / 2 - 0.72);
-      signMesh.rotation.x = -Math.PI / 2;
+      const signWidth = Math.min(3.2, zone.width - 1);
+      const signZ = zone.z + zone.depth / 2 - 0.18;
+      signMesh.position.set(zone.x, zone.kind === 'meeting_room' ? 2.78 : 2.52, signZ);
+      signMesh.rotation.y = Math.PI;
       scene.add(signMesh);
+      const signFrame = new THREE.Mesh(
+        new THREE.BoxGeometry(signWidth + 0.12, 1.12, 0.09),
+        new THREE.MeshStandardMaterial({ color: isDark ? 0x101923 : 0x343b40, metalness: 0.52, roughness: 0.34 })
+      );
+      signFrame.position.set(zone.x, signMesh.position.y, signZ + 0.035);
+      scene.add(signFrame);
+      signMesh.position.z = signZ - 0.02;
+      if (zone.kind === 'department' || zone.kind === 'executive' || zone.kind === 'reception') {
+        for (const postX of [-signWidth * 0.42, signWidth * 0.42]) {
+          const signPost = new THREE.Mesh(new THREE.BoxGeometry(0.055, signMesh.position.y - 0.55, 0.055), facadeRailMat);
+          signPost.position.set(zone.x + postX, (signMesh.position.y - 0.55) / 2, signZ);
+          scene.add(signPost);
+        }
+      }
 
       if (zone.kind === 'reception') {
-        // Reception Counter + Brand Emblem Desk
+        // Timber welcome desk, backlit brand wall, and a small waiting lounge.
         const counter = new THREE.Mesh(
           new THREE.BoxGeometry(5.6, 1.08, 1.15),
-          new THREE.MeshStandardMaterial({ color: isDark ? 0x1e293b : 0xffffff, roughness: 0.3, metalness: 0.1 })
+          new THREE.MeshStandardMaterial({ color: isDark ? 0x24303a : 0x7a6047, roughness: 0.45, metalness: 0.08 })
         );
         counter.position.set(zone.x, 0.54, zone.z - 0.8);
         counter.castShadow = !isSoftwareGl;
+        counter.receiveShadow = true;
         scene.add(counter);
 
-        const brandRibbon = new THREE.Mesh(
-          new THREE.BoxGeometry(5.64, 0.2, 0.08),
-          new THREE.MeshStandardMaterial({ color: primaryColor, roughness: 0.3 })
+        const counterTop = new THREE.Mesh(
+          new THREE.BoxGeometry(5.78, 0.12, 1.28),
+          new THREE.MeshStandardMaterial({ color: isDark ? 0x30373a : 0x3c4140, roughness: 0.24, metalness: 0.1 })
         );
-        brandRibbon.position.set(zone.x, 0.65, zone.z - 0.2);
-        scene.add(brandRibbon);
+        counterTop.position.set(zone.x, 1.12, zone.z - 0.8);
+        counterTop.castShadow = !isSoftwareGl;
+        scene.add(counterTop);
+
+        const receptionToeKick = new THREE.Mesh(
+          new THREE.BoxGeometry(5.35, 0.12, 0.08),
+          new THREE.MeshStandardMaterial({ color: primaryColor, metalness: 0.4, roughness: 0.28, emissive: primaryColor, emissiveIntensity: 0.12 })
+        );
+        receptionToeKick.position.set(zone.x, 0.16, zone.z - 0.2);
+        scene.add(receptionToeKick);
+
+        const welcomeTexture = makeSignTexture(companyName, 'TECHNOLOGY · PRODUCTS · AI', primaryColor, true, maxAnisotropy);
+        disposableTextures.push(welcomeTexture);
+        const welcomeFrame = new THREE.Mesh(
+          new THREE.BoxGeometry(8.4, 2.45, 0.16),
+          new THREE.MeshStandardMaterial({ color: isDark ? 0x0c1722 : 0x1c2b36, roughness: 0.32, metalness: 0.58 })
+        );
+        welcomeFrame.position.set(zone.x, 2.88, zone.z + 2.8);
+        scene.add(welcomeFrame);
+        const welcomePanel = new THREE.Mesh(
+          new THREE.PlaneGeometry(8.08, 2.14),
+          new THREE.MeshStandardMaterial({ map: welcomeTexture, emissiveMap: welcomeTexture, emissive: 0xffffff, emissiveIntensity: 0.18, roughness: 0.3, side: THREE.DoubleSide })
+        );
+        welcomePanel.position.set(zone.x, 2.88, zone.z + 2.71);
+        welcomePanel.rotation.y = Math.PI;
+        scene.add(welcomePanel);
+
+        const loungeFabric = new THREE.MeshStandardMaterial({ color: isDark ? 0x43515b : 0x5e6668, roughness: 0.88 });
+        const loungeLegs = new THREE.MeshStandardMaterial({ color: 0x29343a, metalness: 0.64, roughness: 0.32 });
+        for (const x of [-4.1, 4.1]) {
+          const sofaSeat = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.38, 0.88), loungeFabric);
+          sofaSeat.position.set(x, 0.55, zone.z + 0.5);
+          sofaSeat.castShadow = !isSoftwareGl;
+          scene.add(sofaSeat);
+          const sofaBack = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.82, 0.2), loungeFabric);
+          sofaBack.position.set(x, 0.96, zone.z + 0.84);
+          sofaBack.castShadow = !isSoftwareGl;
+          scene.add(sofaBack);
+          for (const armX of [-1.08, 1.08]) {
+            const arm = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.56, 0.84), loungeFabric);
+            arm.position.set(x + armX, 0.72, zone.z + 0.5);
+            scene.add(arm);
+          }
+          for (const legX of [-0.9, 0.9]) {
+            const leg = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.26, 0.075), loungeLegs);
+            leg.position.set(x + legX, 0.18, zone.z + 0.18);
+            scene.add(leg);
+          }
+        }
+        const coffeeTop = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.82, 0.82, 0.09, 24),
+          new THREE.MeshStandardMaterial({ color: isDark ? 0x313a3d : 0x594b3c, roughness: 0.38, metalness: 0.1 })
+        );
+        coffeeTop.position.set(zone.x, 0.55, zone.z + 0.5);
+        scene.add(coffeeTop);
+        const coffeeStem = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.52, 12), loungeLegs);
+        coffeeStem.position.set(zone.x, 0.29, zone.z + 0.5);
+        scene.add(coffeeStem);
       } else if (zone.kind === 'meeting_room') {
         // Glass Partition Walls (3 sides open at front entrance)
         const wallH = 2.4;
