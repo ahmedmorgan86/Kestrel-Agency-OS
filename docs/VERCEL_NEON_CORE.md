@@ -13,6 +13,8 @@ The first successful database initialization seeds 13 departments, 30 fictional 
 
 Passwords are stored as scrypt hashes. Session tokens are generated from cryptographically secure random bytes; only their SHA-256 hashes are stored in PostgreSQL. Browser sessions use HttpOnly, Secure, SameSite cookies, and the login endpoint throttles repeated failed attempts.
 
+PostgreSQL TLS certificate verification must stay enabled. Academy enrollment accepts the course identifier emitted by the client as well as the course code.
+
 ## Vercel configuration
 
 Store `DATABASE_URL` as a sensitive environment variable on the deployment branch. Do not put connection strings in repository files or client-side `VITE_` variables. The current Neon connection is scoped to the preview branch; production has not been enabled.
