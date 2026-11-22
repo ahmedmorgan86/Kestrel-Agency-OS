@@ -59,6 +59,7 @@ interface CameraPreset {
 
 const CAMERA_PRESETS: CameraPreset[] = [
   { id: 'atrium', label: 'Atrium', pos: [0, 8, 7], target: [0, 1.35, 22] },
+  { id: 'people', label: 'People Walkthrough', pos: [0, 11, 31], target: [0, 1, 8] },
   { id: 'overview', label: 'Full HQ', pos: [0, 18, 43], target: [0, 1.1, 2] },
   { id: 'reception', label: 'Reception', pos: [0, 7, 34], target: [0, 1.2, 19] },
   { id: 'executive', label: 'Executive', pos: [0, 8, 4], target: [0, 1.4, -15] },
@@ -79,6 +80,51 @@ const STATUS_COLORS: Record<OperationalStatus, number> = {
   disabled: 0x475569,
   completed: 0x10b981,
 };
+
+const HUMAN_AVATAR_ASSETS = [
+  '/assets/avatars/human-01.png',
+  '/assets/avatars/human-02.png',
+  '/assets/avatars/human-03.png',
+  '/assets/avatars/human-04.png',
+  '/assets/avatars/human-05.png',
+  '/assets/avatars/human-06.png',
+  '/assets/avatars/human-07.png',
+  '/assets/avatars/human-08.png',
+  '/assets/avatars/human-09.png',
+  '/assets/avatars/human-10.png',
+  '/assets/avatars/human-11.png',
+  '/assets/avatars/human-12.png',
+] as const;
+const FEMININE_AVATAR_INDICES = [0, 2, 4, 5, 6, 7] as const;
+const MASCULINE_AVATAR_INDICES = [1, 3, 8, 9, 10, 11] as const;
+
+const FEMININE_FIRST_NAMES = new Set([
+  'amira', 'ella', 'grace', 'hana', 'isla', 'layla', 'maya', 'mariam', 'nadia', 'priya', 'samira', 'sofia', 'zoe',
+]);
+const MASCULINE_FIRST_NAMES = new Set([
+  'adam', 'daniel', 'ethan', 'karim', 'leo', 'luca', 'milo', 'noah', 'omar', 'owen', 'theo', 'yusuf',
+]);
+
+function stableActorHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function humanAssetIndex(actor: Hq3DActor): number {
+  const firstName = actor.name.trim().split(/\s+/)[0]?.toLocaleLowerCase() || '';
+  const seed = stableActorHash(actor.id);
+  if (FEMININE_FIRST_NAMES.has(firstName)) return FEMININE_AVATAR_INDICES[seed % FEMININE_AVATAR_INDICES.length];
+  if (MASCULINE_FIRST_NAMES.has(firstName)) return MASCULINE_AVATAR_INDICES[seed % MASCULINE_AVATAR_INDICES.length];
+  return seed % HUMAN_AVATAR_ASSETS.length;
+}
+
+function clampWithin(value: number, center: number, extent: number): number {
+  return THREE.MathUtils.clamp(value, center - extent, center + extent);
+}
 
 function makeSignTexture(
   title: string,
@@ -306,7 +352,7 @@ function buildWorkstationGroup(
   return group;
 }
 
-function buildAvatarGroup(actor: Hq3DActor, castShadow: boolean): THREE.Group {
+function buildAvatarGroup(actor: Hq3DActor, castShadow: boolean, humanTexture?: THREE.Texture): THREE.Group {
   const root = new THREE.Group();
   const isAi = actor.actorType === 'agent';
   const accentColor = new THREE.Color(actor.avatarConfig.accentColor || (isAi ? '#2563eb' : '#334155'));
@@ -343,6 +389,7 @@ function buildAvatarGroup(actor: Hq3DActor, castShadow: boolean): THREE.Group {
     ? new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 0.56, 8), torsoMat)
     : new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.19, 0.58, 12), torsoMat);
   lower.position.y = 0.34;
+  lower.visible = isAi;
   lower.castShadow = castShadow;
   root.add(lower);
 
@@ -352,6 +399,7 @@ function buildAvatarGroup(actor: Hq3DActor, castShadow: boolean): THREE.Group {
     : new THREE.BoxGeometry(0.46, 0.56, 0.26);
   const torso = new THREE.Mesh(torsoGeo, accentMat);
   torso.position.y = 0.88;
+  torso.visible = isAi;
   torso.castShadow = castShadow;
   root.add(torso);
 
@@ -360,11 +408,13 @@ function buildAvatarGroup(actor: Hq3DActor, castShadow: boolean): THREE.Group {
   const leftArm = new THREE.Mesh(armGeo, torsoMat);
   leftArm.position.set(-0.3, 0.86, 0.08);
   leftArm.name = 'leftArm';
+  leftArm.visible = isAi;
   root.add(leftArm);
 
   const rightArm = new THREE.Mesh(armGeo, torsoMat);
   rightArm.position.set(0.3, 0.86, 0.08);
   rightArm.name = 'rightArm';
+  rightArm.visible = isAi;
   root.add(rightArm);
 
   // Head
@@ -397,27 +447,30 @@ function buildAvatarGroup(actor: Hq3DActor, castShadow: boolean): THREE.Group {
       root.add(halo);
     }
   } else {
-    // Human head + hair cap
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xe8c3a5, roughness: 0.72, metalness: 0.02 });
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 16, 14), skinMat);
-    head.position.y = 1.38;
-    head.castShadow = castShadow;
-    root.add(head);
-
-    const hair = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.56),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.85 })
+    const humanFigure = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: humanTexture,
+        color: 0xffffff,
+        transparent: true,
+        alphaTest: 0.06,
+        depthWrite: false,
+        toneMapped: false,
+      })
     );
-    hair.position.y = 1.4;
-    root.add(hair);
+    humanFigure.name = 'humanFigure';
+    humanFigure.center.set(0.5, 0);
+    humanFigure.position.set(0, 0.035, 0);
+    humanFigure.scale.set(1.3, 2.1, 1);
+    humanFigure.renderOrder = 2;
+    root.add(humanFigure);
   }
 
   // Accessory
-  if (actor.avatarConfig.accessory === 'headset') {
+  if (isAi && actor.avatarConfig.accessory === 'headset') {
     const band = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.022, 6, 16, Math.PI), torsoMat);
     band.position.y = 1.4;
     root.add(band);
-  } else if (actor.avatarConfig.accessory === 'badge') {
+  } else if (isAi && actor.avatarConfig.accessory === 'badge') {
     const badge = new THREE.Mesh(
       new THREE.BoxGeometry(0.1, 0.12, 0.03),
       new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 })
@@ -618,6 +671,20 @@ export function VirtualHq3D({
     const disposableTextures: THREE.Texture[] = [];
     const interactables: THREE.Object3D[] = [];
     const animatedAvatars: THREE.Group[] = [];
+    const humanMotion: Array<{
+      avatar: THREE.Group;
+      home: THREE.Vector3;
+      destination: THREE.Vector3;
+      phase: number;
+      walkCycle: number;
+    }> = [];
+    const humanTextures = HUMAN_AVATAR_ASSETS.map((assetPath) => {
+      const texture = new THREE.TextureLoader().load(assetPath);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = maxAnisotropy;
+      disposableTextures.push(texture);
+      return texture;
+    });
 
     // Main architectural concrete floor plate
     const floorTex = makeFloorGridTexture(isDark, maxAnisotropy);
@@ -1023,21 +1090,43 @@ export function VirtualHq3D({
       }
     }
 
-    // Place all real Human & AI Avatars
+    // Place photorealistic virtual people and the existing AI robots.
     for (const actor of actors) {
-      const avatar = buildAvatarGroup(actor, !isSoftwareGl);
+      const actorTexture = actor.actorType === 'human' ? humanTextures[humanAssetIndex(actor)] : undefined;
+      const avatar = buildAvatarGroup(actor, !isSoftwareGl, actorTexture);
       const isSeatedInMeeting = actor.operationalStatus === 'in_meeting';
       const offsetZ = isSeatedInMeeting ? 0 : actor.worldPosition.rotY === 0 ? 0.35 : -0.35;
       avatar.position.set(actor.worldPosition.x, 0, actor.worldPosition.z + offsetZ);
       avatar.rotation.y = actor.worldPosition.rotY;
       scene.add(avatar);
       interactables.push(avatar);
-      if (
-        actor.operationalStatus === 'working' ||
-        actor.operationalStatus === 'validating' ||
-        actor.operationalStatus === 'waiting_for_approval' ||
-        actor.operationalStatus === 'failed'
-      ) {
+
+      if (actor.actorType === 'human' && !isSeatedInMeeting) {
+        const zone = zones.find((item) => item.id === actor.worldPosition.zoneId);
+        const seed = stableActorHash(actor.id);
+        const home = avatar.position.clone();
+        const zoneX = zone?.x ?? home.x;
+        const zoneZ = zone?.z ?? home.z;
+        const maxX = Math.max(0.45, (zone?.width ?? 4) / 2 - 0.7);
+        const maxZ = Math.max(0.45, (zone?.depth ?? 4) / 2 - 0.7);
+        const directionX = seed % 2 === 0 ? 1 : -1;
+        const directionZ = seed % 3 === 0 ? 1 : -1;
+        const destination = new THREE.Vector3(
+          clampWithin(home.x + directionX * Math.min(1.45, maxX * 0.8), zoneX, maxX),
+          0,
+          clampWithin(home.z + directionZ * Math.min(1.1, maxZ * 0.75), zoneZ, maxZ)
+        );
+        humanMotion.push({
+          avatar,
+          home,
+          destination,
+          phase: (seed % 26000) / 1000,
+          walkCycle: 28 + (seed % 5000) / 1000,
+        });
+      }
+      const isActiveAgent = actor.actorType === 'agent' &&
+        ['working', 'validating', 'waiting_for_approval', 'failed'].includes(actor.operationalStatus);
+      if (isActiveAgent) {
         animatedAvatars.push(avatar);
       }
     }
@@ -1185,6 +1274,38 @@ export function VirtualHq3D({
       }
 
       // Honest state-driven motion: ONLY animate avatars whose backend state is genuinely active/alerting
+      if (!reducedMotion && humanMotion.length > 0) {
+        for (const motion of humanMotion) {
+          const cyclePosition = (elapsed + motion.phase) % motion.walkCycle;
+          const walkOutStart = 7;
+          const walkOutEnd = 10.5;
+          const returnStart = 17;
+          const returnEnd = 20.5;
+          let progress = 0;
+          let walking = false;
+          if (cyclePosition >= walkOutStart && cyclePosition < walkOutEnd) {
+            progress = (cyclePosition - walkOutStart) / (walkOutEnd - walkOutStart);
+            walking = true;
+          } else if (cyclePosition >= walkOutEnd && cyclePosition < returnStart) {
+            progress = 1;
+          } else if (cyclePosition >= returnStart && cyclePosition < returnEnd) {
+            progress = 1 - (cyclePosition - returnStart) / (returnEnd - returnStart);
+            walking = true;
+          }
+          const eased = progress * progress * (3 - 2 * progress);
+          motion.avatar.position.x = THREE.MathUtils.lerp(motion.home.x, motion.destination.x, eased);
+          motion.avatar.position.z = THREE.MathUtils.lerp(motion.home.z, motion.destination.z, eased);
+          motion.avatar.rotation.y = walking
+            ? Math.atan2(motion.destination.x - motion.home.x, motion.destination.z - motion.home.z)
+            : 0;
+          const figure = motion.avatar.getObjectByName('humanFigure');
+          if (figure) {
+            figure.position.y = 0.035 + (walking ? Math.abs(Math.sin(elapsed * 9 + motion.phase)) * 0.045 : Math.sin(elapsed * 1.8 + motion.phase) * 0.012);
+          }
+        }
+        keepAnimating = true;
+      }
+
       if (!reducedMotion && animatedAvatars.length > 0) {
         for (let i = 0; i < animatedAvatars.length; i += 1) {
           const av = animatedAvatars[i];
