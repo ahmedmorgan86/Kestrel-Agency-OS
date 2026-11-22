@@ -14,7 +14,7 @@ export interface CompanyBrandIdentity {
 const DEFAULT_BRAND: CompanyBrandIdentity = {
   name: 'MORGAN GROUP',
   legalName: 'MORGAN GROUP',
-  tagline: 'Technology, built together',
+  tagline: 'محتوى يصنع فرقاً',
   primaryColor: '#0e7490',
   secondaryColor: '#0b1726',
   symbol: 'prism',

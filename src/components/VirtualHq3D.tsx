@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinnedModel } from 'three/addons/utils/SkeletonUtils.js';
 import { Camera, ChevronDown, ChevronUp, Compass, Layers, RotateCcw } from 'lucide-react';
 import type { AvatarConfig, OperationalStatus, ZoneRect } from '../domain/hq';
 
@@ -57,14 +59,39 @@ interface CameraPreset {
   target: [number, number, number];
 }
 
+interface HumanoidAsset {
+  slug: string;
+  scene: THREE.Group;
+  animations: THREE.AnimationClip[];
+}
+
+const HUMAN_ASSETS = ['casual-walker', 'dog-walker', 'hiker', 'road-worker'];
+
+interface AnimatedHuman {
+  root: THREE.Group;
+  model: THREE.Object3D;
+  mixer: THREE.AnimationMixer;
+  desiredAction: THREE.AnimationAction;
+  walkAction: THREE.AnimationAction | null;
+  status: OperationalStatus;
+  startPosition: THREE.Vector3;
+  targetPosition: THREE.Vector3;
+  startRotationY: number;
+  targetRotationY: number;
+  transitionDuration: number;
+  transitionProgress: number;
+  inTransition: boolean;
+  isSeated: boolean;
+}
+
 const CAMERA_PRESETS: CameraPreset[] = [
-  { id: 'atrium', label: 'Atrium', pos: [0, 8, 7], target: [0, 1.35, 22] },
-  { id: 'people', label: 'People Walkthrough', pos: [0, 11, 31], target: [0, 1, 8] },
-  { id: 'overview', label: 'Full HQ', pos: [0, 18, 43], target: [0, 1.1, 2] },
-  { id: 'reception', label: 'Reception', pos: [0, 7, 34], target: [0, 1.2, 19] },
-  { id: 'executive', label: 'Executive', pos: [0, 8, 4], target: [0, 1.4, -15] },
-  { id: 'creative', label: 'Product Studio', pos: [-14, 8.5, 17], target: [-6, 1, 3] },
-  { id: 'meetings', label: 'Boardrooms', pos: [-19, 8.5, -2], target: [-15, 1, -15] },
+  { id: 'atrium', label: 'البهو', pos: [0, 8, 7], target: [0, 1.35, 22] },
+  { id: 'people', label: 'مساحة الفريق', pos: [0, 11, 31], target: [0, 1, 8] },
+  { id: 'overview', label: 'نظرة عامة', pos: [0, 18, 43], target: [0, 1.1, 2] },
+  { id: 'reception', label: 'الاستقبال', pos: [0, 7, 34], target: [0, 1.2, 19] },
+  { id: 'executive', label: 'الإدارة', pos: [0, 8, 4], target: [0, 1.4, -15] },
+  { id: 'creative', label: 'استوديو الإنتاج', pos: [-14, 8.5, 17], target: [-6, 1, 3] },
+  { id: 'meetings', label: 'غرف الاجتماعات', pos: [-19, 8.5, -2], target: [-15, 1, -15] },
 ];
 
 const STATUS_COLORS: Record<OperationalStatus, number> = {
@@ -81,30 +108,6 @@ const STATUS_COLORS: Record<OperationalStatus, number> = {
   completed: 0x10b981,
 };
 
-const HUMAN_AVATAR_ASSETS = [
-  '/assets/avatars/human-01.png',
-  '/assets/avatars/human-02.png',
-  '/assets/avatars/human-03.png',
-  '/assets/avatars/human-04.png',
-  '/assets/avatars/human-05.png',
-  '/assets/avatars/human-06.png',
-  '/assets/avatars/human-07.png',
-  '/assets/avatars/human-08.png',
-  '/assets/avatars/human-09.png',
-  '/assets/avatars/human-10.png',
-  '/assets/avatars/human-11.png',
-  '/assets/avatars/human-12.png',
-] as const;
-const FEMININE_AVATAR_INDICES = [0, 2, 4, 5, 6, 7] as const;
-const MASCULINE_AVATAR_INDICES = [1, 3, 8, 9, 10, 11] as const;
-
-const FEMININE_FIRST_NAMES = new Set([
-  'amira', 'ella', 'grace', 'hana', 'isla', 'layla', 'maya', 'mariam', 'nadia', 'priya', 'samira', 'sofia', 'zoe',
-]);
-const MASCULINE_FIRST_NAMES = new Set([
-  'adam', 'daniel', 'ethan', 'karim', 'leo', 'luca', 'milo', 'noah', 'omar', 'owen', 'theo', 'yusuf',
-]);
-
 function stableActorHash(value: string): number {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -112,18 +115,6 @@ function stableActorHash(value: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
-}
-
-function humanAssetIndex(actor: Hq3DActor): number {
-  const firstName = actor.name.trim().split(/\s+/)[0]?.toLocaleLowerCase() || '';
-  const seed = stableActorHash(actor.id);
-  if (FEMININE_FIRST_NAMES.has(firstName)) return FEMININE_AVATAR_INDICES[seed % FEMININE_AVATAR_INDICES.length];
-  if (MASCULINE_FIRST_NAMES.has(firstName)) return MASCULINE_AVATAR_INDICES[seed % MASCULINE_AVATAR_INDICES.length];
-  return seed % HUMAN_AVATAR_ASSETS.length;
-}
-
-function clampWithin(value: number, center: number, extent: number): number {
-  return THREE.MathUtils.clamp(value, center - extent, center + extent);
 }
 
 function makeSignTexture(
@@ -352,7 +343,7 @@ function buildWorkstationGroup(
   return group;
 }
 
-function buildAvatarGroup(actor: Hq3DActor, castShadow: boolean, humanTexture?: THREE.Texture): THREE.Group {
+function buildAvatarGroup(actor: Hq3DActor, castShadow: boolean): THREE.Group {
   const root = new THREE.Group();
   const isAi = actor.actorType === 'agent';
   const accentColor = new THREE.Color(actor.avatarConfig.accentColor || (isAi ? '#2563eb' : '#334155'));
@@ -447,22 +438,87 @@ function buildAvatarGroup(actor: Hq3DActor, castShadow: boolean, humanTexture?: 
       root.add(halo);
     }
   } else {
-    const humanFigure = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: humanTexture,
-        color: 0xffffff,
-        transparent: true,
-        alphaTest: 0.06,
-        depthWrite: false,
-        toneMapped: false,
-      })
-    );
-    humanFigure.name = 'humanFigure';
-    humanFigure.center.set(0.5, 0);
-    humanFigure.position.set(0, 0.035, 0);
-    humanFigure.scale.set(1.3, 2.1, 1);
-    humanFigure.renderOrder = 2;
-    root.add(humanFigure);
+    const seed = stableActorHash(actor.id);
+    const skinTones = ['#f0c7a5', '#d7a27c', '#bd805f', '#8d5d45', '#e4b28c', '#c48d6b'];
+    const hairTones = ['#211b18', '#3c2c24', '#5b3827', '#252b34', '#6b4a35'];
+    const skinMat = new THREE.MeshStandardMaterial({ color: skinTones[seed % skinTones.length], roughness: 0.82 });
+    const hairMat = new THREE.MeshStandardMaterial({ color: hairTones[(seed >>> 4) % hairTones.length], roughness: 0.88 });
+    const shirtMat = new THREE.MeshStandardMaterial({ color: '#e7e5e4', roughness: 0.8 });
+    const trouserMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.84 });
+    const shoeMat = new THREE.MeshStandardMaterial({ color: '#1f2937', roughness: 0.72 });
+    const addMesh = (geometry: THREE.BufferGeometry, material: THREE.Material, name: string, x: number, y: number, z: number) => {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = name;
+      mesh.position.set(x, y, z);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = true;
+      root.add(mesh);
+      return mesh;
+    };
+
+    // Fully three-dimensional low-poly people: face, hair, jacket, hands, trousers, and shoes.
+    addMesh(new THREE.CylinderGeometry(0.075, 0.085, 0.16, 10), skinMat, 'humanNeck', 0, 1.29, 0);
+    const body = addMesh(new THREE.CapsuleGeometry(0.2, 0.38, 4, 12), accentMat, 'humanJacket', 0, 0.99, 0);
+    body.scale.set(1.05, 1, 0.8);
+    addMesh(new THREE.CapsuleGeometry(0.13, 0.25, 3, 10), shirtMat, 'humanShirt', 0, 1.01, -0.115);
+
+    const head = new THREE.Group();
+    head.name = 'humanHead';
+    head.position.y = 1.51;
+    root.add(head);
+    const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.145, 18, 14), skinMat);
+    headMesh.name = 'humanFace';
+    headMesh.scale.set(0.92, 1.08, 0.88);
+    headMesh.castShadow = castShadow;
+    head.add(headMesh);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.151, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.65), hairMat);
+    hair.name = 'humanHair';
+    hair.position.y = 0.034;
+    hair.castShadow = castShadow;
+    head.add(hair);
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), new THREE.MeshStandardMaterial({ color: '#263238', roughness: 0.4 }));
+      eye.position.set(side * 0.047, 0.006, -0.124);
+      head.add(eye);
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 6), skinMat);
+      ear.position.set(side * 0.134, -0.015, 0);
+      head.add(ear);
+    }
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), skinMat);
+    nose.position.set(0, -0.026, -0.139);
+    head.add(nose);
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.009, 0.008), new THREE.MeshStandardMaterial({ color: '#7a3f3d', roughness: 0.7 }));
+    mouth.position.set(0, -0.072, -0.127);
+    head.add(mouth);
+
+    for (const side of [-1, 1]) {
+      const arm = new THREE.Group();
+      arm.name = side < 0 ? 'leftArm' : 'rightArm';
+      arm.position.set(side * 0.22, 1.16, 0);
+      root.add(arm);
+      const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 0.2, 3, 8), accentMat);
+      sleeve.position.y = -0.16;
+      sleeve.rotation.z = side * -0.12;
+      sleeve.castShadow = castShadow;
+      arm.add(sleeve);
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), skinMat);
+      hand.position.set(side * -0.035, -0.34, -0.01);
+      hand.name = 'humanHand';
+      arm.add(hand);
+
+      const leg = new THREE.Group();
+      leg.name = side < 0 ? 'leftLeg' : 'rightLeg';
+      leg.position.set(side * 0.085, 0.62, 0);
+      root.add(leg);
+      const trouser = new THREE.Mesh(new THREE.CapsuleGeometry(0.075, 0.23, 3, 8), trouserMat);
+      trouser.position.y = -0.19;
+      trouser.castShadow = castShadow;
+      leg.add(trouser);
+      const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.24), shoeMat);
+      shoe.position.set(0, -0.4, -0.055);
+      shoe.castShadow = castShadow;
+      leg.add(shoe);
+    }
   }
 
   // Accessory
@@ -518,6 +574,73 @@ function buildAvatarGroup(actor: Hq3DActor, castShadow: boolean, humanTexture?: 
   return root;
 }
 
+function buildRiggedHumanGroup(
+  actor: Hq3DActor,
+  asset: HumanoidAsset,
+  castShadow: boolean,
+  startsWalking: boolean
+) {
+  const root = new THREE.Group();
+  const model = cloneSkinnedModel(asset.scene);
+  model.name = `humanModel:${actor.id}`;
+  model.traverse((object) => {
+    if (object instanceof THREE.Mesh) {
+      object.castShadow = castShadow;
+      object.receiveShadow = true;
+      object.frustumCulled = false;
+    }
+  });
+  root.add(model);
+
+  const statusHex = STATUS_COLORS[actor.operationalStatus] ?? 0x64748b;
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.32, 0.42, 24),
+    new THREE.MeshStandardMaterial({
+      color: statusHex,
+      emissive: statusHex,
+      emissiveIntensity: actor.operationalStatus === 'idle' || actor.operationalStatus === 'paused' ? 0.04 : 0.22,
+      roughness: 0.6,
+    })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.025;
+  root.add(ring);
+
+  if (actor.operationalStatus === 'waiting_for_approval' || actor.operationalStatus === 'failed') {
+    const beacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.075, 12, 8),
+      new THREE.MeshStandardMaterial({ color: statusHex, emissive: statusHex, emissiveIntensity: 0.7 })
+    );
+    beacon.position.y = 1.92;
+    beacon.name = 'statusBeacon';
+    root.add(beacon);
+  }
+
+  const hitMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.42, 1.85, 10),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  hitMesh.position.y = 0.92;
+  hitMesh.userData.hqSelection = { kind: 'human', id: actor.id, label: actor.name } satisfies Hq3DSelection;
+  root.add(hitMesh);
+  root.userData.hqSelection = { kind: 'human', id: actor.id, label: actor.name } satisfies Hq3DSelection;
+  root.userData.actorStatus = actor.operationalStatus;
+
+  const mixer = new THREE.AnimationMixer(model);
+  const animationName = actor.operationalStatus === 'queued'
+    ? 'walk'
+    : actor.operationalStatus === 'in_meeting'
+    ? 'look_around'
+    : 'idle';
+  const clip = asset.animations.find((item) => item.name.toLowerCase() === animationName) ?? asset.animations[0];
+  const desiredAction = clip ? mixer.clipAction(clip) : mixer.clipAction(new THREE.AnimationClip('idle', 1, []));
+  const walkClip = asset.animations.find((item) => item.name.toLowerCase() === 'walk');
+  const walkAction = walkClip ? mixer.clipAction(walkClip) : null;
+  if (startsWalking && walkAction) walkAction.play();
+  else desiredAction.play();
+  return { root, model, mixer, desiredAction, walkAction };
+}
+
 export function VirtualHq3D({
   companyName,
   primaryColor,
@@ -537,6 +660,27 @@ export function VirtualHq3D({
   const [dockExpanded, setDockExpanded] = useState<boolean>(true);
   const [contextLost, setContextLost] = useState<boolean>(false);
   const [webglFailed, setWebglFailed] = useState<boolean>(false);
+  const [humanoidAssets, setHumanoidAssets] = useState<HumanoidAsset[]>([]);
+  const actorPositionsRef = useRef(new Map<string, { position: THREE.Vector3; rotationY: number }>());
+
+  useEffect(() => {
+    const loader = new GLTFLoader();
+    let active = true;
+    void Promise.allSettled(
+      HUMAN_ASSETS.map(async (slug) => {
+        const gltf = await loader.loadAsync(`/assets/avatars/${slug}.glb`);
+        return { slug, scene: gltf.scene, animations: gltf.animations } satisfies HumanoidAsset;
+      })
+    ).then((results) => {
+      if (!active) return;
+      const loaded = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
+      if (loaded.length) setHumanoidAssets(loaded);
+      if (loaded.length !== HUMAN_ASSETS.length) {
+        console.warn('Some licensed 3D employee models did not load; using the built-in fallback model.');
+      }
+    });
+    return () => { active = false; };
+  }, []);
 
   const cameraGoalRef = useRef<{
     pos: THREE.Vector3;
@@ -554,8 +698,19 @@ export function VirtualHq3D({
 
   const triggerPreset = (preset: CameraPreset) => {
     setActivePreset(preset.id);
-    cameraGoalRef.current.pos.set(...preset.pos);
-    cameraGoalRef.current.target.set(...preset.target);
+    let position: [number, number, number] = preset.pos;
+    let target: [number, number, number] = preset.target;
+    if (preset.id === 'meetings') {
+      const activeRoom = meetingRooms.find((room) => room.activeMeeting);
+      const roomZone = activeRoom ? zones.find((zone) => zone.id === activeRoom.id) : null;
+      if (roomZone) {
+        // Follow the room that is actually hosting the active meeting, even when it is not the first room alphabetically.
+        position = [roomZone.x - 2, 8.5, roomZone.z + 11];
+        target = [roomZone.x, 1, roomZone.z];
+      }
+    }
+    cameraGoalRef.current.pos.set(...position);
+    cameraGoalRef.current.target.set(...target);
     cameraGoalRef.current.active = true;
     requestRenderRef.current();
   };
@@ -671,21 +826,7 @@ export function VirtualHq3D({
     const disposableTextures: THREE.Texture[] = [];
     const interactables: THREE.Object3D[] = [];
     const animatedAvatars: THREE.Group[] = [];
-    const humanMotion: Array<{
-      avatar: THREE.Group;
-      home: THREE.Vector3;
-      destination: THREE.Vector3;
-      phase: number;
-      walkCycle: number;
-    }> = [];
-    const humanTextures = HUMAN_AVATAR_ASSETS.map((assetPath) => {
-      const texture = new THREE.TextureLoader().load(assetPath);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.anisotropy = maxAnisotropy;
-      disposableTextures.push(texture);
-      return texture;
-    });
-
+    const animatedHumans: AnimatedHuman[] = [];
     // Main architectural concrete floor plate
     const floorTex = makeFloorGridTexture(isDark, maxAnisotropy);
     disposableTextures.push(floorTex);
@@ -1090,10 +1231,47 @@ export function VirtualHq3D({
       }
     }
 
-    // Place photorealistic virtual people and the existing AI robots.
+    // Place three-dimensional staff and AI colleagues at their current work or meeting positions.
     for (const actor of actors) {
-      const actorTexture = actor.actorType === 'human' ? humanTextures[humanAssetIndex(actor)] : undefined;
-      const avatar = buildAvatarGroup(actor, !isSoftwareGl, actorTexture);
+      if (actor.actorType === 'human' && humanoidAssets.length > 0) {
+        const asset = humanoidAssets[stableActorHash(actor.id) % humanoidAssets.length];
+        const isSeated = ['working', 'validating', 'in_meeting'].includes(actor.operationalStatus);
+        const offsetZ = actor.operationalStatus === 'in_meeting' ? 0 : actor.worldPosition.rotY === 0 ? 0.35 : -0.35;
+        const targetPosition = new THREE.Vector3(
+          actor.worldPosition.x,
+          0,
+          actor.worldPosition.z + offsetZ
+        );
+        const targetRotationY = actor.worldPosition.rotY + (actor.operationalStatus === 'in_meeting' ? 0 : Math.PI);
+        const previous = actorPositionsRef.current.get(actor.id);
+        const startPosition = previous?.position.clone() ?? targetPosition.clone();
+        const startRotationY = previous?.rotationY ?? targetRotationY;
+        const distance = startPosition.distanceTo(targetPosition);
+        const startsWalking = distance > 0.45 && !reducedMotion;
+        const human = buildRiggedHumanGroup(actor, asset, !isSoftwareGl, startsWalking);
+        human.root.position.copy(startPosition);
+        human.root.rotation.y = startRotationY;
+        human.model.rotation.y = 0;
+        human.model.scale.setScalar(0.96 + (stableActorHash(`${actor.id}:height`) % 9) * 0.01);
+        if (isSeated) human.model.position.y = -0.36;
+        scene.add(human.root);
+        interactables.push(human.root);
+        animatedHumans.push({
+          ...human,
+          status: actor.operationalStatus,
+          startPosition,
+          targetPosition,
+          startRotationY,
+          targetRotationY,
+          transitionDuration: Math.max(0.65, Math.min(3, distance / 1.25)),
+          transitionProgress: startsWalking ? 0 : 1,
+          inTransition: startsWalking,
+          isSeated,
+        });
+        actorPositionsRef.current.set(actor.id, { position: targetPosition.clone(), rotationY: targetRotationY });
+        continue;
+      }
+      const avatar = buildAvatarGroup(actor, !isSoftwareGl);
       const isSeatedInMeeting = actor.operationalStatus === 'in_meeting';
       const offsetZ = isSeatedInMeeting ? 0 : actor.worldPosition.rotY === 0 ? 0.35 : -0.35;
       avatar.position.set(actor.worldPosition.x, 0, actor.worldPosition.z + offsetZ);
@@ -1101,32 +1279,10 @@ export function VirtualHq3D({
       scene.add(avatar);
       interactables.push(avatar);
 
-      if (actor.actorType === 'human' && !isSeatedInMeeting) {
-        const zone = zones.find((item) => item.id === actor.worldPosition.zoneId);
-        const seed = stableActorHash(actor.id);
-        const home = avatar.position.clone();
-        const zoneX = zone?.x ?? home.x;
-        const zoneZ = zone?.z ?? home.z;
-        const maxX = Math.max(0.45, (zone?.width ?? 4) / 2 - 0.7);
-        const maxZ = Math.max(0.45, (zone?.depth ?? 4) / 2 - 0.7);
-        const directionX = seed % 2 === 0 ? 1 : -1;
-        const directionZ = seed % 3 === 0 ? 1 : -1;
-        const destination = new THREE.Vector3(
-          clampWithin(home.x + directionX * Math.min(1.45, maxX * 0.8), zoneX, maxX),
-          0,
-          clampWithin(home.z + directionZ * Math.min(1.1, maxZ * 0.75), zoneZ, maxZ)
-        );
-        humanMotion.push({
-          avatar,
-          home,
-          destination,
-          phase: (seed % 26000) / 1000,
-          walkCycle: 28 + (seed % 5000) / 1000,
-        });
-      }
-      const isActiveAgent = actor.actorType === 'agent' &&
-        ['working', 'validating', 'waiting_for_approval', 'failed'].includes(actor.operationalStatus);
-      if (isActiveAgent) {
+      const isActiveActor = actor.actorType === 'agent'
+        ? ['working', 'validating', 'waiting_for_approval', 'failed'].includes(actor.operationalStatus)
+        : ['working', 'validating', 'in_meeting'].includes(actor.operationalStatus);
+      if (isActiveActor) {
         animatedAvatars.push(avatar);
       }
     }
@@ -1273,55 +1429,76 @@ export function VirtualHq3D({
         }
       }
 
-      // Honest state-driven motion: ONLY animate avatars whose backend state is genuinely active/alerting
-      if (!reducedMotion && humanMotion.length > 0) {
-        for (const motion of humanMotion) {
-          const cyclePosition = (elapsed + motion.phase) % motion.walkCycle;
-          const walkOutStart = 7;
-          const walkOutEnd = 10.5;
-          const returnStart = 17;
-          const returnEnd = 20.5;
-          let progress = 0;
-          let walking = false;
-          if (cyclePosition >= walkOutStart && cyclePosition < walkOutEnd) {
-            progress = (cyclePosition - walkOutStart) / (walkOutEnd - walkOutStart);
-            walking = true;
-          } else if (cyclePosition >= walkOutEnd && cyclePosition < returnStart) {
-            progress = 1;
-          } else if (cyclePosition >= returnStart && cyclePosition < returnEnd) {
-            progress = 1 - (cyclePosition - returnStart) / (returnEnd - returnStart);
-            walking = true;
-          }
-          const eased = progress * progress * (3 - 2 * progress);
-          motion.avatar.position.x = THREE.MathUtils.lerp(motion.home.x, motion.destination.x, eased);
-          motion.avatar.position.z = THREE.MathUtils.lerp(motion.home.z, motion.destination.z, eased);
-          motion.avatar.rotation.y = walking
-            ? Math.atan2(motion.destination.x - motion.home.x, motion.destination.z - motion.home.z)
-            : 0;
-          const figure = motion.avatar.getObjectByName('humanFigure');
-          if (figure) {
-            figure.position.y = 0.035 + (walking ? Math.abs(Math.sin(elapsed * 9 + motion.phase)) * 0.045 : Math.sin(elapsed * 1.8 + motion.phase) * 0.012);
+      // Agents keep their restrained task indicators; human movement uses the rigged CC0 skeletons.
+      if (!reducedMotion && animatedAvatars.length > 0) {
+        for (let i = 0; i < animatedAvatars.length; i += 1) {
+          const av = animatedAvatars[i];
+          const status = av.userData.actorStatus as OperationalStatus;
+          const beacon = av.getObjectByName('statusBeacon');
+          if (beacon) {
+            beacon.rotation.y = elapsed * 2.2;
           }
         }
         keepAnimating = true;
       }
 
-      if (!reducedMotion && animatedAvatars.length > 0) {
-        for (let i = 0; i < animatedAvatars.length; i += 1) {
-          const av = animatedAvatars[i];
-          const status = av.userData.actorStatus as OperationalStatus;
-          if (status === 'working' || status === 'validating') {
-            const leftArm = av.getObjectByName('leftArm');
-            const rightArm = av.getObjectByName('rightArm');
-            if (leftArm && rightArm) {
-              leftArm.rotation.x = -0.6 + Math.sin(elapsed * 7 + i) * 0.14;
-              rightArm.rotation.x = -0.6 + Math.cos(elapsed * 7 + i) * 0.14;
+      if (!reducedMotion && animatedHumans.length > 0) {
+        for (let i = 0; i < animatedHumans.length; i += 1) {
+          const person = animatedHumans[i];
+          person.mixer.update(dt);
+
+          if (person.inTransition && person.walkAction) {
+            person.transitionProgress = Math.min(1, person.transitionProgress + dt / person.transitionDuration);
+            const t = THREE.MathUtils.smoothstep(person.transitionProgress, 0, 1);
+            person.root.position.lerpVectors(person.startPosition, person.targetPosition, t);
+            const turn = THREE.MathUtils.euclideanModulo(person.targetRotationY - person.startRotationY + Math.PI, Math.PI * 2) - Math.PI;
+            person.root.rotation.y = person.startRotationY + turn * t;
+            keepAnimating = true;
+
+            if (person.transitionProgress >= 1) {
+              person.inTransition = false;
+              person.walkAction.fadeOut(0.22);
+              person.desiredAction.reset().fadeIn(0.22).play();
             }
           }
-          const beacon = av.getObjectByName('statusBeacon');
-          if (beacon) {
-            beacon.rotation.y = elapsed * 2.2;
+
+          if (person.isSeated) {
+            // A simple seated pose at the actual meeting chair or work station, on the asset's 56-bone rig.
+            const leftThigh = person.model.getObjectByName('thigh_L');
+            const rightThigh = person.model.getObjectByName('thigh_R');
+            const leftCalf = person.model.getObjectByName('calf_L');
+            const rightCalf = person.model.getObjectByName('calf_R');
+            const leftUpperArm = person.model.getObjectByName('upperarm_L');
+            const rightUpperArm = person.model.getObjectByName('upperarm_R');
+            const leftForearm = person.model.getObjectByName('forearm_L');
+            const rightForearm = person.model.getObjectByName('forearm_R');
+            const head = person.model.getObjectByName('head');
+
+            if (leftThigh) leftThigh.rotation.x = 0.95;
+            if (rightThigh) rightThigh.rotation.x = 0.95;
+            if (leftCalf) leftCalf.rotation.x = -1.12;
+            if (rightCalf) rightCalf.rotation.x = -1.12;
+            if (person.status === 'working' || person.status === 'validating') {
+              const typing = Math.sin(elapsed * 8 + i) * 0.035;
+              if (leftUpperArm) leftUpperArm.rotation.x = -0.22 + typing;
+              if (rightUpperArm) rightUpperArm.rotation.x = -0.22 - typing;
+              if (leftForearm) leftForearm.rotation.x = -0.48 - typing;
+              if (rightForearm) rightForearm.rotation.x = -0.48 + typing;
+              if (head) head.rotation.x = 0.08 + Math.sin(elapsed * 0.7 + i) * 0.025;
+            } else {
+              if (leftUpperArm) leftUpperArm.rotation.x = 0.08 + Math.sin(elapsed * 1.1 + i) * 0.04;
+              if (rightUpperArm) rightUpperArm.rotation.x = 0.08 - Math.sin(elapsed * 1.1 + i) * 0.04;
+              if (leftForearm) leftForearm.rotation.x = -0.12;
+              if (rightForearm) rightForearm.rotation.x = -0.12;
+              if (head) {
+                head.rotation.y = Math.sin(elapsed * 0.55 + i * 2) * 0.12;
+                head.rotation.x = Math.sin(elapsed * 0.8 + i) * 0.035;
+              }
+            }
           }
+
+          const beacon = person.root.getObjectByName('statusBeacon');
+          if (beacon) beacon.rotation.y = elapsed * 1.6;
         }
         keepAnimating = true;
       }
@@ -1385,17 +1562,17 @@ export function VirtualHq3D({
       pmrem.dispose();
       renderer.dispose();
     };
-  }, [companyName, primaryColor, theme, reducedMotion, zones, actors, meetingRooms, pendingApprovalsCount, selectedId, onWebglUnavailable]);
+  }, [companyName, primaryColor, theme, reducedMotion, zones, actors, meetingRooms, pendingApprovalsCount, selectedId, onWebglUnavailable, humanoidAssets]);
 
   if (webglFailed) {
     return (
       <div className="h-[520px] rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
         <Layers className="w-8 h-8 text-slate-400 mb-3" />
         <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-          3D WebGL Renderer Unavailable on This Device
+          العرض ثلاثي الأبعاد غير متاح على هذا الجهاز
         </h3>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 max-w-md">
-          Switch to the 2D Operational Floor Map tab above for full interactive headquarters navigation.
+          استخدم تبويب مخطط المقر للتنقل بين أقسام الشركة.
         </p>
       </div>
     );
@@ -1403,18 +1580,18 @@ export function VirtualHq3D({
 
   return (
     <div className="relative w-full h-[560px] lg:h-[620px] rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-200 dark:bg-slate-950 select-none">
-      <div ref={containerRef} className="w-full h-full" aria-label="Interactive 3D Virtual Company Headquarters" />
+      <div ref={containerRef} className="w-full h-full" aria-label="مقر الشركة التفاعلي ثلاثي الأبعاد" />
 
       {/* Top-Left Minimal Context Chip (No backdrop-filter over WebGL!) */}
       <div className="absolute top-3 left-3 z-10 pointer-events-none flex items-center gap-2">
         <div className="bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 rounded-md px-3 py-1.5 text-xs font-medium text-slate-800 dark:text-slate-200 shadow-xs">
-          {hoveredLabel ? `Inspect: ${hoveredLabel}` : 'Drag to orbit · Scroll to zoom · Click any avatar, room, or screen'}
+          {hoveredLabel ? `عرض: ${hoveredLabel}` : 'اسحب لتدوير المشهد · مرّر للتقريب · اختر موظفاً أو غرفة أو شاشة'}
         </div>
       </div>
 
       {contextLost && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-900/80 text-white text-sm">
-          Restoring 3D WebGL context...
+          جارٍ استعادة عرض المقر...
         </div>
       )}
 
@@ -1424,22 +1601,22 @@ export function VirtualHq3D({
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
               <Compass className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" aria-hidden="true" />
-              <span>HQ Camera</span>
+              <span>زاوية العرض</span>
             </div>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => triggerPreset(CAMERA_PRESETS[0])}
                 className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                title="Reset camera overview"
+                title="إعادة ضبط زاوية العرض"
               >
                 <RotateCcw className="w-3 h-3" />
-                Reset
+                إعادة ضبط
               </button>
               <button
                 type="button"
                 onClick={() => setDockExpanded((v) => !v)}
-                aria-label={dockExpanded ? 'Collapse camera controls' : 'Expand camera controls'}
+                aria-label={dockExpanded ? 'طي أدوات العرض' : 'فتح أدوات العرض'}
                 className="p-1 rounded text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 {dockExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
