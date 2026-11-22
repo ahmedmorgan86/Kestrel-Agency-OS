@@ -39,6 +39,7 @@ import {
   X,
 } from 'lucide-react';
 import { apiRequest, setStoredToken } from './lib/api';
+import { ApiError } from './lib/api';
 import { useThemeAndBrand } from './context/ThemeAndBrandContext';
 import { BrandLockup } from './components/BrandMark';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
@@ -158,6 +159,7 @@ type ActiveDetail =
 export default function App() {
   const { theme, toggleTheme, brand, updateBrandFromOrg } = useThemeAndBrand();
   const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [route, setRoute] = useState('chairman');
@@ -192,6 +194,7 @@ export default function App() {
       }
     } catch {
       setUser(null);
+      setAuthError('بيانات الشركة غير متاحة في هذا النشر حتى يتم ربط قاعدة بيانات تشغيلية.');
     } finally {
       setAuthLoading(false);
     }
@@ -245,6 +248,18 @@ export default function App() {
   }
 
   if (!user) {
+    if (authError) {
+      return (
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 flex items-center justify-center">
+          <div className="w-full max-w-lg rounded-xl border border-amber-200 bg-white p-8 shadow-sm dark:border-amber-900 dark:bg-slate-900">
+            <BrandLockup name={brand.name} tagline={brand.tagline} symbol={brand.symbol} primaryColor={brand.primaryColor} variant="lockup" />
+            <h1 className="mt-6 text-2xl font-semibold text-slate-900 dark:text-white">الموقع معروض، لكن النظام غير متصل بعد</h1>
+            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{authError}</p>
+            <p className="mt-3 text-xs leading-5 text-slate-500 dark:text-slate-400">هذه نسخة واجهة منشورة للفحص. سجلات الموظفين والعمليات وتسجيل الدخول لن تعمل حتى ربط قاعدة بيانات مستقلة وآمنة.</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <AuthScreen
         initialized={initialized}
