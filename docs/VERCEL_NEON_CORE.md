@@ -24,3 +24,5 @@ Store `DATABASE_URL` as a sensitive environment variable on the deployment branc
 ## Scope
 
 The existing Express/SQLite modules for task workers, integrations, files, finance, agent execution, and realtime events are not served by this Vercel function yet. Requests for those routes return an explicit `not_migrated` response. The current HQ snapshot includes the real seeded staff roster but does not claim that simulated employees or AI agents are executing work.
+
+On the Vercel Hobby plan, keep API routes consolidated in the catch-all function; the existing pi/[...path].js handler routes /api/clients and /api/projects as well as nested paths. This keeps the project under the 12-function deployment limit.
