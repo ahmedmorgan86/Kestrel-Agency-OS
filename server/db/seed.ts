@@ -22,6 +22,48 @@ const DEPARTMENTS = [
   { code: 'finance_operations', name: 'Finance and Operations', description: 'Revenue tracking, AI usage cost accounting, expenses, and client profitability.' },
 ] as const;
 
+// These are intentionally fictional, login-free employees for the virtual company simulation.
+// Reserved .example addresses and zero cost values prevent contact or payroll data from being implied.
+const VIRTUAL_EMPLOYEES: Array<{ name: string; department: string; title: string }> = [
+  { name: 'Avery Brooks', department: 'executive', title: 'Chief Executive Officer' },
+  { name: 'Jordan Lee', department: 'executive', title: 'Chief Technology Officer' },
+  { name: 'Morgan Ellis', department: 'executive', title: 'Chief Operating Officer' },
+  { name: 'Riley Chen', department: 'executive', title: 'Executive Assistant' },
+  { name: 'Samira Haddad', department: 'strategy_research', title: 'Director of Strategy' },
+  { name: 'Ethan Cole', department: 'strategy_research', title: 'Market Research Analyst' },
+  { name: 'Maya Patel', department: 'strategy_research', title: 'Audience Insights Analyst' },
+  { name: 'Noah Bennett', department: 'social_media_mgmt', title: 'Social Media Director' },
+  { name: 'Layla Hassan', department: 'social_media_mgmt', title: 'Social Media Manager' },
+  { name: 'Theo Martin', department: 'social_media_mgmt', title: 'Community Manager' },
+  { name: 'Grace Kim', department: 'content_planning', title: 'Content Planning Lead' },
+  { name: 'Omar Farouk', department: 'content_planning', title: 'Editorial Planner' },
+  { name: 'Zoe Ramirez', department: 'content_copywriting', title: 'Copywriting Lead' },
+  { name: 'Adam Wilson', department: 'content_copywriting', title: 'Senior Copywriter' },
+  { name: 'Nadia Saleh', department: 'content_copywriting', title: 'Scriptwriter' },
+  { name: 'Luca Moretti', department: 'creative_direction', title: 'Creative Director' },
+  { name: 'Amira Nasser', department: 'creative_direction', title: 'Art Director' },
+  { name: 'Leo Fischer', department: 'graphic_design', title: 'Design Lead' },
+  { name: 'Hana Youssef', department: 'graphic_design', title: 'Brand Designer' },
+  { name: 'Milo Turner', department: 'graphic_design', title: 'Motion Designer' },
+  { name: 'Sofia Cruz', department: 'video_production', title: 'Video Production Lead' },
+  { name: 'Karim Adel', department: 'video_production', title: 'Video Editor' },
+  { name: 'Ella Scott', department: 'quality_assurance', title: 'Quality Lead' },
+  { name: 'Yusuf Mansour', department: 'quality_assurance', title: 'Content Reviewer' },
+  { name: 'Isla Morgan', department: 'client_success', title: 'Client Success Lead' },
+  { name: 'Daniel Park', department: 'client_success', title: 'Client Partner' },
+  { name: 'Mariam Khalil', department: 'publishing_distribution', title: 'Publishing Lead' },
+  { name: 'Alex Rivera', department: 'publishing_distribution', title: 'Distribution Coordinator' },
+  { name: 'Priya Shah', department: 'analytics_reporting', title: 'Analytics Lead' },
+  { name: 'Owen Brooks', department: 'finance_operations', title: 'Finance & Operations Lead' },
+];
+
+const ACADEMY_COURSES = [
+  { code: 'company-foundations', title: 'MORGAN GROUP Foundations', description: 'The company mission, operating principles, governance, and how teams work together.', lessons: ['Our mission and principles', 'How departments collaborate', 'Decision rights and escalation'] },
+  { code: 'ai-collaboration', title: 'Working with AI Colleagues', description: 'A practical guide to AI agent capabilities, safe delegation, and human review.', lessons: ['What agents can and cannot do', 'Writing useful assignments', 'Reviewing AI work responsibly'] },
+  { code: 'security-and-trust', title: 'Security, Privacy & Trust', description: 'Everyday practices for protecting company data, credentials, and customer trust.', lessons: ['Recognizing sensitive data', 'Secure access and secrets', 'Incident reporting'] },
+  { code: 'leadership-and-craft', title: 'Leadership & Professional Craft', description: 'Build clear communication, thoughtful feedback, and strong team habits.', lessons: ['Clear written communication', 'Giving and receiving feedback', 'Continuous improvement'] },
+];
+
 const MEETING_ROOMS = [
   {
     id: 'room_executive_boardroom', code: 'exec_boardroom', name: 'Executive Boardroom',
@@ -364,8 +406,10 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
 
   // 1. Default Organization
   db.prepare(`
-    INSERT OR IGNORE INTO organizations (id, name, legal_name, website, default_currency, timezone, governance_policy_json, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR IGNORE INTO organizations (
+      id, name, legal_name, website, default_currency, timezone, governance_policy_json,
+      tagline, brand_primary_color, brand_secondary_color, brand_symbol, logo_style, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     DEFAULT_ORG_ID,
     'MORGAN GROUP',
@@ -380,6 +424,11 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
       invalidateApprovalOnContentEdit: true,
       prohibitAgentSelfApproval: true,
     }),
+    'Technology, built together',
+    '#0e7490',
+    '#0b1726',
+    'prism',
+    'lockup',
     ts,
     ts
   );
@@ -403,7 +452,60 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
     deptIdsByCode.set(dept.code, id);
   }
 
-  // 2b. 4 Real Virtual Meeting Rooms
+  // 2a. Thirty fictional staff members for the interactive company simulation.
+  const virtualCeosId = 'employee_virtual_01';
+  const insertVirtualEmployee = db.prepare(`
+    INSERT OR IGNORE INTO employees (
+      id, organization_id, user_id, department_id, full_name, email, job_title,
+      manager_employee_id, employment_status, monthly_cost_cents, joining_date,
+      avatar_config_json, workstation_code, created_at, updated_at
+    ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 'active', 0, ?, '{}', ?, ?, ?)
+  `);
+  VIRTUAL_EMPLOYEES.forEach((employee, index) => {
+    const ordinal = String(index + 1).padStart(2, '0');
+    const employeeId = `employee_virtual_${ordinal}`;
+    const departmentId = deptIdsByCode.get(employee.department) ?? null;
+    insertVirtualEmployee.run(
+      employeeId,
+      DEFAULT_ORG_ID,
+      departmentId,
+      employee.name,
+      `team-${ordinal}@morgangroup.example`,
+      employee.title,
+      index === 0 ? null : virtualCeosId,
+      '2026-01-05',
+      `desk-${ordinal}`,
+      ts,
+      ts
+    );
+    if (index === 0 || VIRTUAL_EMPLOYEES[index - 1]?.department !== employee.department) {
+      db.prepare('UPDATE departments SET lead_employee_id = COALESCE(lead_employee_id, ?) WHERE id = ?')
+        .run(employeeId, departmentId);
+    }
+  });
+
+  // 2b. Learning catalog starts with curriculum content only; no completions are invented.
+  const insertAcademyCourse = db.prepare(`
+    INSERT OR IGNORE INTO academy_courses (
+      id, organization_id, code, title, description, curriculum_json,
+      sort_order, status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+  `);
+  ACADEMY_COURSES.forEach((course, index) => {
+    insertAcademyCourse.run(
+      `course_${course.code}`,
+      DEFAULT_ORG_ID,
+      course.code,
+      course.title,
+      course.description,
+      JSON.stringify(course.lessons),
+      index + 1,
+      ts,
+      ts
+    );
+  });
+
+  // 2c. 4 Real Virtual Meeting Rooms
   const insertRoom = db.prepare(`
     INSERT OR IGNORE INTO meeting_rooms (id, organization_id, code, name, room_type, capacity, description, color_hex, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

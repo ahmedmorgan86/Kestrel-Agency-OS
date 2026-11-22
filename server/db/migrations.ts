@@ -842,6 +842,53 @@ export const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_company_events_created ON company_events(created_at DESC);
     `,
   },
+  {
+    version: '003',
+    name: 'morgan_academy',
+    sql: `
+      CREATE TABLE IF NOT EXISTS academy_courses (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        code TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        curriculum_json TEXT NOT NULL DEFAULT '[]',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS academy_enrollments (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        course_id TEXT NOT NULL REFERENCES academy_courses(id) ON DELETE CASCADE,
+        employee_id TEXT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+        progress_percent INTEGER NOT NULL DEFAULT 0 CHECK (progress_percent BETWEEN 0 AND 100),
+        status TEXT NOT NULL DEFAULT 'enrolled' CHECK (status IN ('enrolled','in_progress','completed')),
+        enrolled_at TEXT NOT NULL,
+        completed_at TEXT,
+        updated_at TEXT NOT NULL,
+        UNIQUE(course_id, employee_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_academy_enrollments_employee ON academy_enrollments(employee_id, updated_at DESC);
+    `,
+  },
+  {
+    version: '004',
+    name: 'morgan_group_identity',
+    sql: `
+      UPDATE organizations
+      SET name = CASE WHEN name IN ('Kestrel Social Agency', 'Kestrel Agency OS') THEN 'MORGAN GROUP' ELSE name END,
+          legal_name = CASE WHEN legal_name IN ('Kestrel Social Media Operations LLC', 'Kestrel Agency OS') THEN 'MORGAN GROUP' ELSE legal_name END,
+          tagline = CASE WHEN tagline = 'AI-First Social Media Operations' THEN 'Technology, built together' ELSE tagline END,
+          brand_primary_color = CASE WHEN brand_primary_color = '#1d4ed8' THEN '#0e7490' ELSE brand_primary_color END,
+          brand_secondary_color = CASE WHEN brand_secondary_color = '#0f172a' THEN '#0b1726' ELSE brand_secondary_color END,
+          brand_symbol = CASE WHEN brand_symbol = 'kestrel' THEN 'prism' ELSE brand_symbol END,
+          updated_at = ?
+      WHERE id = 'org_kestrel_agency';
+    `,
+  },
 ];
 
 function ensureColumn(db: DatabaseSync, table: string, column: string, definition: string): void {
@@ -894,7 +941,11 @@ export function runMigrations(db: DatabaseSync): { applied: string[] } {
     if (appliedSet.has(migration.version)) continue;
     db.exec('BEGIN IMMEDIATE');
     try {
-      db.exec(migration.sql);
+      if (migration.version === '004') {
+        db.prepare(migration.sql).run(nowIso());
+      } else {
+        db.exec(migration.sql);
+      }
       if (migration.version === '002') {
         applyAdditiveColumnsFor002(db);
       }

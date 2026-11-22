@@ -316,6 +316,7 @@ hqAndMeetingsRouter.get('/hq/state', requireAuth, (req: AuthedRequest, res) => {
       activeMeetings: activeMeetings.length,
       workingAgents: agents.filter((a) => a.operationalStatus === 'working').length,
       totalHumans: humans.length,
+      virtualEmployees: humans.filter((employee) => String(employee.id).startsWith('employee_virtual_')).length,
       totalAgents: agents.length,
       totalDepartments: departments.length,
     },

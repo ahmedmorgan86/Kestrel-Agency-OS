@@ -17,6 +17,7 @@ import { clientsAndWorkRouter } from './server/routes/clientsAndWork';
 import { studioAndGovRouter } from './server/routes/studioAndGov';
 import { distributionAndFinanceRouter } from './server/routes/distributionAndFinance';
 import { hqAndMeetingsRouter } from './server/routes/hqAndMeetings';
+import { academyRouter } from './server/routes/academy';
 
 export async function createAppServer() {
   const db = initDatabase();
@@ -44,6 +45,7 @@ export async function createAppServer() {
   app.use('/api', studioAndGovRouter);
   app.use('/api', distributionAndFinanceRouter);
   app.use('/api', hqAndMeetingsRouter);
+  app.use('/api', academyRouter);
 
   // Structured API error handler (never leaks stack traces or secrets to client)
   app.use(

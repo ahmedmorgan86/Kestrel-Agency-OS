@@ -17,8 +17,10 @@ test('database migrations, honest system config seed, auth bootstrap, credential
   const db = initDatabase(':memory:');
   const { applied } = runMigrations(db);
   assert.ok(applied.includes('001_initial_agency_os_schema'));
+  assert.ok(applied.includes('003_morgan_academy'));
+  assert.ok(applied.includes('004_morgan_group_identity'));
 
-  // Idempotent seed creates system config ONLY — zero fake business data!
+  // Seed is idempotent, and the virtual workforce is clearly separate from client and activity data.
   seedSystemConfiguration(db);
   seedSystemConfiguration(db);
 
@@ -31,10 +33,34 @@ test('database migrations, honest system config seed, auth bootstrap, credential
     .get() as { status: string } | undefined;
 
   const meetingRoomCount = (db.prepare('SELECT COUNT(*) as c FROM meeting_rooms').get() as { c: number }).c;
+  const employeeCount = (db.prepare('SELECT COUNT(*) as c FROM employees').get() as { c: number }).c;
+  const courseCount = (db.prepare('SELECT COUNT(*) as c FROM academy_courses').get() as { c: number }).c;
+  const enrollmentCount = (db.prepare('SELECT COUNT(*) as c FROM academy_enrollments').get() as { c: number }).c;
 
   assert.equal(deptCount, 13);
   assert.equal(meetingRoomCount, 4);
   assert.equal(agentCount, 14);
+  assert.equal(employeeCount, 30, 'The virtual company starts with 30 fictional, login-free employees');
+  assert.equal(courseCount, 4, 'The academy catalog is seeded with its learning paths');
+  assert.equal(enrollmentCount, 0, 'No learning completions or enrollments are fabricated');
+  const organization = db.prepare('SELECT name, tagline, brand_symbol FROM organizations WHERE id = ?').get('org_kestrel_agency') as { name: string; tagline: string; brand_symbol: string };
+  assert.equal(organization.name, 'MORGAN GROUP');
+  assert.equal(organization.tagline, 'Technology, built together');
+  assert.equal(organization.brand_symbol, 'prism');
+
+  const courseId = String((db.prepare('SELECT id FROM academy_courses ORDER BY sort_order LIMIT 1').get() as { id: string }).id);
+  const employeeId = String((db.prepare('SELECT id FROM employees ORDER BY id LIMIT 1').get() as { id: string }).id);
+  const stamp = new Date().toISOString();
+  db.prepare(`INSERT INTO academy_enrollments (id, organization_id, course_id, employee_id, enrolled_at, updated_at)
+              VALUES ('enrollment_test', 'org_kestrel_agency', ?, ?, ?, ?)`)
+    .run(courseId, employeeId, stamp, stamp);
+  db.prepare(`UPDATE academy_enrollments SET progress_percent = 100, status = 'completed', completed_at = ?, updated_at = ?
+              WHERE id = 'enrollment_test'`)
+    .run(stamp, stamp);
+  const completedEnrollment = db.prepare(`SELECT progress_percent, status FROM academy_enrollments WHERE id = 'enrollment_test'`)
+    .get() as { progress_percent: number; status: string };
+  assert.equal(completedEnrollment.progress_percent, 100);
+  assert.equal(completedEnrollment.status, 'completed');
   assert.equal(clientCount, 0, 'Production seed must contain zero fabricated clients');
   assert.equal(runCount, 0, 'Production seed must contain zero fabricated agent executions');
   assert.ok(supaInteg, 'Supabase integration must be seeded');

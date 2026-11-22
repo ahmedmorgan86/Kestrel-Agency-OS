@@ -82,11 +82,11 @@ export function AuthScreen({
           />
         </div>
         <h1 className="mt-6 text-center text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-          {initialized ? 'Sign in to Agency Operations' : 'Initialize Agency Administrator'}
+          {initialized ? 'Sign in to MORGAN GROUP' : 'Initialize MORGAN GROUP'}
         </h1>
         <p className="mt-2 text-center text-sm text-slate-600 dark:text-slate-400">
           {initialized
-            ? 'Internal AI-first social media agency operating platform & virtual headquarters.'
+            ? 'Your virtual technology company, headquarters, team, and AI colleagues.'
             : 'No administrator account exists yet. Create the initial Super Administrator account to unlock internal operations.'}
         </p>
       </div>
