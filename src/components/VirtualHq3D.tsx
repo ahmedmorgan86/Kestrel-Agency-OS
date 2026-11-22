@@ -698,8 +698,19 @@ export function VirtualHq3D({
 
   const triggerPreset = (preset: CameraPreset) => {
     setActivePreset(preset.id);
-    cameraGoalRef.current.pos.set(...preset.pos);
-    cameraGoalRef.current.target.set(...preset.target);
+    let position: [number, number, number] = preset.pos;
+    let target: [number, number, number] = preset.target;
+    if (preset.id === 'meetings') {
+      const activeRoom = meetingRooms.find((room) => room.activeMeeting);
+      const roomZone = activeRoom ? zones.find((zone) => zone.id === activeRoom.id) : null;
+      if (roomZone) {
+        // Follow the room that is actually hosting the active meeting, even when it is not the first room alphabetically.
+        position = [roomZone.x - 2, 8.5, roomZone.z + 11];
+        target = [roomZone.x, 1, roomZone.z];
+      }
+    }
+    cameraGoalRef.current.pos.set(...position);
+    cameraGoalRef.current.target.set(...target);
     cameraGoalRef.current.active = true;
     requestRenderRef.current();
   };
