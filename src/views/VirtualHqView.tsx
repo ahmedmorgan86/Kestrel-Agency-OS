@@ -1016,7 +1016,27 @@ export function VirtualHqView({
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {hq.departments.map((d) => (
+          {hq.departments.map((d) => {
+            const departmentKeys = new Set(
+              [d.id, d.code, d.department_code, d.name]
+                .filter((value) => value != null && value !== '')
+                .map((value) => String(value).trim().toLocaleLowerCase()),
+            );
+            const isAiColleague = (person: Record<string, any>) =>
+              person.actor_type === 'agent'
+              || String(person.id || '').startsWith('employee_virtual_')
+              || person.profile?.profileType === 'ai_agent';
+            const departmentAiCount = hq.humans.filter((person) =>
+              isAiColleague(person)
+              && [person.department_id, person.department_code, person.department_name]
+                .filter((value) => value != null && value !== '')
+                .some((value) => departmentKeys.has(String(value).trim().toLocaleLowerCase())),
+            ).length + hq.agents.filter((agent) =>
+              [agent.department_id, agent.department_code, agent.department_name]
+                .filter((value) => value != null && value !== '')
+                .some((value) => departmentKeys.has(String(value).trim().toLocaleLowerCase())),
+            ).length;
+            return (
             <div
               key={d.id}
               className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-500/50 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900"
@@ -1032,7 +1052,7 @@ export function VirtualHqView({
                 </div>
               </div>
               <div className="space-y-4 p-5">
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500 dark:text-slate-400"><span><b className="text-slate-900 dark:text-slate-100">{(d.employee_count || 0) + (d.agent_count || 0)}</b> زميل ذكاء اصطناعي</span><span><b className="text-slate-900 dark:text-slate-100">{d.active_tasks || 0}</b> مهام مفتوحة</span><span><b className="text-slate-900 dark:text-slate-100">{d.completed_tasks || 0}</b> مكتملة</span></div>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500 dark:text-slate-400"><span><b className="text-slate-900 dark:text-slate-100">{departmentAiCount}</b> زميل ذكاء اصطناعي</span><span><b className="text-slate-900 dark:text-slate-100">{d.active_tasks || 0}</b> مهام مفتوحة</span><span><b className="text-slate-900 dark:text-slate-100">{d.completed_tasks || 0}</b> مكتملة</span></div>
                 <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
                   <span className="truncate text-xs text-slate-500 dark:text-slate-400">قيادة التخصص: {d.manager_name || 'قائد الفريق الافتراضي'}</span>
                   <button
@@ -1045,7 +1065,8 @@ export function VirtualHqView({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
           </div>
         </div>
       )}
