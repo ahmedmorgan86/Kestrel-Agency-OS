@@ -265,9 +265,9 @@ export function VirtualHqView({
       {/* Top Operational Summary Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <StatTile label="أقسام الإنتاج" value={counts?.totalDepartments ?? 0} meta="تخصصات فريق الشركة" onClick={() => setTab('directory')} />
-        <StatTile label="شخصيات الفريق" value={counts?.virtualEmployees ?? 0} meta="نماذج افتراضية بأدوار وتخصصات محددة" onClick={() => onNavigate('employees')} />
+        <StatTile label="فريق الذكاء الاصطناعي" value={counts?.virtualEmployees ?? 0} meta="30 زميلاً افتراضياً بتخصصات وأسماء مصرية" onClick={() => onNavigate('employees')} />
         <StatTile
-          label="وكلاء الذكاء الاصطناعي"
+          label="وكلاء التشغيل المتخصصون"
           value={counts?.totalAgents ?? 0}
           meta={`${counts?.workingAgents ?? 0} ينفذون مهام الآن`}
           tone={(counts?.workingAgents ?? 0) > 0 ? 'positive' : 'default'}
@@ -337,7 +337,7 @@ export function VirtualHqView({
             <div className="max-w-xl pt-16 sm:pt-20">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-200">Technology, built together</p>
               <h2 className="mt-4 max-w-lg text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl">
-                Welcome to a more human kind of technology company.
+                مقر MORGAN GROUP · استوديو إنتاج ذكي
               </h2>
               <p className="mt-4 max-w-md text-sm leading-6 text-slate-200 sm:text-base">
                 Meet the team, explore the operating floor, and see how people and AI colleagues work together.
@@ -800,7 +800,7 @@ export function VirtualHqView({
                         onClick={() => onOpenDepartment(dept.id)}
                         className="font-medium text-blue-700 dark:text-blue-400 hover:underline"
                       >
-                        Open Workspace
+                        فتح مساحة القسم
                       </button>
                     </div>
                   </div>
@@ -831,9 +831,9 @@ export function VirtualHqView({
               onChange={(e) => setOrgTypeFilter(e.target.value as 'all' | 'human' | 'agent')}
               className={`${INPUT_CLASS} w-40`}
             >
-              <option value="all">Humans & AI</option>
-              <option value="human">Humans Only</option>
-              <option value="agent">AI Agents Only</option>
+              <option value="all">الفريق بالكامل</option>
+              <option value="human">الموظفون الافتراضيون</option>
+              <option value="agent">وكلاء التشغيل</option>
             </select>
             <select
               aria-label="Filter by department"
@@ -878,7 +878,7 @@ export function VirtualHqView({
             )}
           </SectionCard>
 
-          {/* Tier 2 & 3: Departments -> Managers -> Humans & AI Agents */}
+          {/* Tier 2 & 3: Departments -> Managers -> AI colleagues */}
           <div className="space-y-3">
             {hq.orgChart.departments
               .filter((b) => !orgDeptFilter || b.id === orgDeptFilter)
@@ -1012,7 +1012,7 @@ export function VirtualHqView({
             <div className="pointer-events-none absolute -left-12 -top-24 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
             <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div><div className="text-xs font-semibold tracking-[.22em] text-cyan-300">MORGAN GROUP · AI STUDIO</div><h2 className="mt-3 text-2xl font-bold sm:text-3xl">فريق الإنتاج الذكي</h2><p className="mt-2 max-w-2xl text-sm leading-7 text-slate-300">وكلاء ذكاء اصطناعي بأسماء وتخصصات واضحة. كل مهمة تمر بالمراجعة النهائية لصاحب الشركة قبل النشر.</p></div>
-              <div className="flex gap-3">{[{label:'الأقسام',value:hq.departments.length},{label:'وكلاء نشطون',value:hq.agents.filter((a)=>a.operationalStatus==='working').length},{label:'بانتظار موافقتك',value:counts?.pendingApprovals??0}].map((item)=><div key={item.label} className="min-w-24 rounded-xl border border-white/10 bg-white/5 px-4 py-3"><div className="text-xl font-bold tabular-nums">{item.value}</div><div className="mt-1 text-[11px] text-slate-400">{item.label}</div></div>)}</div>
+              <div className="flex gap-3">{[{label:'الأقسام',value:hq.departments.length},{label:'زملاء الذكاء الاصطناعي',value:hq.counts.virtualEmployees + hq.counts.totalAgents},{label:'بانتظار موافقتك',value:counts?.pendingApprovals??0}].map((item)=><div key={item.label} className="min-w-24 rounded-xl border border-white/10 bg-white/5 px-4 py-3"><div className="text-xl font-bold tabular-nums">{item.value}</div><div className="mt-1 text-[11px] text-slate-400">{item.label}</div></div>)}</div>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -1032,7 +1032,7 @@ export function VirtualHqView({
                 </div>
               </div>
               <div className="space-y-4 p-5">
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500 dark:text-slate-400"><span><b className="text-slate-900 dark:text-slate-100">{d.agent_count || 0}</b> وكيل ذكاء اصطناعي</span><span><b className="text-slate-900 dark:text-slate-100">{d.active_tasks || 0}</b> مهام مفتوحة</span><span><b className="text-slate-900 dark:text-slate-100">{d.completed_tasks || 0}</b> مكتملة</span></div>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500 dark:text-slate-400"><span><b className="text-slate-900 dark:text-slate-100">{(d.employee_count || 0) + (d.agent_count || 0)}</b> زميل ذكاء اصطناعي</span><span><b className="text-slate-900 dark:text-slate-100">{d.active_tasks || 0}</b> مهام مفتوحة</span><span><b className="text-slate-900 dark:text-slate-100">{d.completed_tasks || 0}</b> مكتملة</span></div>
                 <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
                   <span className="truncate text-xs text-slate-500 dark:text-slate-400">قيادة التخصص: {d.manager_name || 'قائد الفريق الافتراضي'}</span>
                   <button
@@ -1194,8 +1194,7 @@ export function DepartmentWorkspaceView({
       <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatTile label="Human Members" value={humans.length} meta="Assigned staff" />
-        <StatTile label="AI Employees" value={agents.length} meta="Specialized department agents" />
+        <StatTile label="زملاء الذكاء الاصطناعي" value={humans.length + agents.length} meta="فريق هذا القسم" />
         <StatTile
           label="Open Work Queue"
           value={tasks.filter((t) => !['completed', 'cancelled'].includes(t.status)).length}
@@ -1205,9 +1204,9 @@ export function DepartmentWorkspaceView({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SectionCard title={`Human Team (${humans.length})`}>
+        <SectionCard title={`الموظفون الافتراضيون (${humans.length})`}>
           {humans.length === 0 ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">No human employees assigned to this department yet.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">لا يوجد زملاء افتراضيون معينون لهذا القسم بعد.</p>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {humans.map((h) => (
@@ -1231,9 +1230,9 @@ export function DepartmentWorkspaceView({
           )}
         </SectionCard>
 
-        <SectionCard title={`AI Employees (${agents.length})`}>
+        <SectionCard title={`وكلاء التشغيل (${agents.length})`}>
           {agents.length === 0 ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">No AI agents assigned to this department yet.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">لا يوجد وكلاء تشغيل معينون لهذا القسم بعد.</p>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {agents.map((a) => (
