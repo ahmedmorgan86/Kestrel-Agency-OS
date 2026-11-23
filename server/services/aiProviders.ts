@@ -59,6 +59,17 @@ export function getOllamaGenerationTimeoutSeconds(): number {
   return Math.max(60, Math.min(1800, Math.floor(configured)));
 }
 
+export function getOllamaNumThreads(): number {
+  const configured = Number(process.env.OLLAMA_NUM_THREADS || 4);
+  if (!Number.isFinite(configured)) return 4;
+  return Math.max(1, Math.min(8, Math.floor(configured)));
+}
+
+export function getOllamaKeepAlive(): string {
+  const configured = process.env.OLLAMA_KEEP_ALIVE?.trim();
+  return configured && configured.length <= 32 ? configured : '60s';
+}
+
 async function readOllamaChatStream(response: Response) {
   if (!response.body) throw new Error('Ollama returned an empty response body.');
   const reader = response.body.getReader();
@@ -186,6 +197,7 @@ export async function generateStructuredText(
       model,
       stream: true,
       think: false,
+      keep_alive: getOllamaKeepAlive(),
       format: req.expectJson ? 'json' : undefined,
       messages: [
         { role: 'system', content: req.systemInstruction },
@@ -193,6 +205,9 @@ export async function generateStructuredText(
       ],
       options: {
         temperature: req.expectJson ? 0.2 : 0.65,
+        // Cap CPU contention on the owner's 8-core desktop without changing model,
+        // context window, or sampling settings. This affects throughput only.
+        num_thread: getOllamaNumThreads(),
         num_predict: Math.max(64, Math.min(1800, Math.floor(req.maxOutputTokens ?? (req.expectJson ? 700 : 900)))),
       },
     });

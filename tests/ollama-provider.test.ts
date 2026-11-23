@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { generateStructuredText, getOllamaGenerationTimeoutSeconds, verifyOllamaConnection } from '../server/services/aiProviders';
+import { generateStructuredText, getOllamaGenerationTimeoutSeconds, getOllamaKeepAlive, getOllamaNumThreads, verifyOllamaConnection } from '../server/services/aiProviders';
 
 test('local generation timeout defaults high enough for CPU inference and clamps unsafe values', () => {
   const previous = process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS;
@@ -17,6 +17,38 @@ test('local generation timeout defaults high enough for CPU inference and clamps
   } finally {
     if (previous === undefined) delete process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS;
     else process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS = previous;
+  }
+});
+
+test('local generation caps CPU threads without changing the model quality settings', () => {
+  const previous = process.env.OLLAMA_NUM_THREADS;
+  try {
+    delete process.env.OLLAMA_NUM_THREADS;
+    assert.equal(getOllamaNumThreads(), 4);
+    process.env.OLLAMA_NUM_THREADS = '12';
+    assert.equal(getOllamaNumThreads(), 8);
+    process.env.OLLAMA_NUM_THREADS = '0';
+    assert.equal(getOllamaNumThreads(), 1);
+    process.env.OLLAMA_NUM_THREADS = 'invalid';
+    assert.equal(getOllamaNumThreads(), 4);
+  } finally {
+    if (previous === undefined) delete process.env.OLLAMA_NUM_THREADS;
+    else process.env.OLLAMA_NUM_THREADS = previous;
+  }
+});
+
+test('local generation releases idle model memory after one minute by default', () => {
+  const previous = process.env.OLLAMA_KEEP_ALIVE;
+  try {
+    delete process.env.OLLAMA_KEEP_ALIVE;
+    assert.equal(getOllamaKeepAlive(), '60s');
+    process.env.OLLAMA_KEEP_ALIVE = '10m';
+    assert.equal(getOllamaKeepAlive(), '10m');
+    process.env.OLLAMA_KEEP_ALIVE = 'x'.repeat(33);
+    assert.equal(getOllamaKeepAlive(), '60s');
+  } finally {
+    if (previous === undefined) delete process.env.OLLAMA_KEEP_ALIVE;
+    else process.env.OLLAMA_KEEP_ALIVE = previous;
   }
 });
 
@@ -46,6 +78,8 @@ test('local Ollama adapter verifies the configured model and returns structured 
   const previousBase = process.env.OLLAMA_BASE_URL;
   const previousModel = process.env.OLLAMA_MODEL;
   const previousTimeout = process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS;
+  const previousThreads = process.env.OLLAMA_NUM_THREADS;
+  const previousKeepAlive = process.env.OLLAMA_KEEP_ALIVE;
   process.env.OLLAMA_BASE_URL = `http://127.0.0.1:${address.port}`;
   process.env.OLLAMA_MODEL = 'qwen3.5:4b';
 
@@ -69,6 +103,8 @@ test('local Ollama adapter verifies the configured model and returns structured 
     assert.equal(captured.chatBody?.stream, true);
     assert.equal(captured.chatBody?.think, false);
     assert.equal((captured.chatBody?.options as Record<string, unknown>)?.num_predict, 700);
+    assert.equal((captured.chatBody?.options as Record<string, unknown>)?.num_thread, 4);
+    assert.equal(captured.chatBody?.keep_alive, '60s');
   } finally {
     if (previousBase === undefined) delete process.env.OLLAMA_BASE_URL;
     else process.env.OLLAMA_BASE_URL = previousBase;
@@ -76,6 +112,10 @@ test('local Ollama adapter verifies the configured model and returns structured 
     else process.env.OLLAMA_MODEL = previousModel;
     if (previousTimeout === undefined) delete process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS;
     else process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS = previousTimeout;
+    if (previousThreads === undefined) delete process.env.OLLAMA_NUM_THREADS;
+    else process.env.OLLAMA_NUM_THREADS = previousThreads;
+    if (previousKeepAlive === undefined) delete process.env.OLLAMA_KEEP_ALIVE;
+    else process.env.OLLAMA_KEEP_ALIVE = previousKeepAlive;
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
