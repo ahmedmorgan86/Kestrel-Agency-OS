@@ -45,6 +45,7 @@ For public deployment, use a persistent-volume host and TLS termination. Never d
 - The worker polls `background_jobs` every 2 seconds and claims due jobs with a lease (`lease_expires_at`).
 - **Crash Recovery**: If the process crashes mid-job, `reclaimStaleLeases` automatically re-queues expired leases on startup and every sweep cycle.
 - **Retries & Dead-Lettering**: Transient errors retry with exponential backoff (`computeExponentialBackoffMs`). Jobs exhausting `max_attempts` move to `dead_letter` and log a `system_events` entry.
+- **MORGAN GROUP local generation**: A dropped Ollama connection is retried up to two times per specialist stage. If a production run still fails, only the organization owner can start a linked replacement run from the production screen; the failed run and its error remain in the history. Other administrators cannot accept, re-run, or publish the owner's content.
 - **Timeout Reconciliation**: External social publishing calls that time out after 15 seconds are classified as `timeout_reconciliation_required` rather than blindly retried, preventing duplicate live posts.
 
 ## 4. Backup & Recovery Runbook

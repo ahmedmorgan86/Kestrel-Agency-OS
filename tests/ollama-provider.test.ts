@@ -79,3 +79,46 @@ test('local Ollama adapter verifies the configured model and returns structured 
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });
+
+test('local Ollama adapter retries a transient connection reset once before failing a production stage', async (t) => {
+  let requests = 0;
+  const server = createServer(async (req, res) => {
+    if (req.url !== '/api/chat') return res.writeHead(404).end();
+    requests += 1;
+    for await (const _chunk of req) { /* consume request body */ }
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
+    res.end(`${JSON.stringify({ message: { content: '{"ready":true}' }, done: false })}\n${JSON.stringify({ done: true })}\n`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const previousBase = process.env.OLLAMA_BASE_URL;
+  const previousModel = process.env.OLLAMA_MODEL;
+  const realFetch = globalThis.fetch;
+  process.env.OLLAMA_BASE_URL = `http://127.0.0.1:${address.port}`;
+  process.env.OLLAMA_MODEL = 'qwen3.5:4b';
+  let simulatedDisconnects = 0;
+  globalThis.fetch = async (input, init) => {
+    if (String(input).endsWith('/api/chat') && simulatedDisconnects === 0) {
+      simulatedDisconnects += 1;
+      throw new TypeError('fetch failed: ECONNRESET');
+    }
+    return realFetch(input, init);
+  };
+
+  t.after(async () => {
+    globalThis.fetch = realFetch;
+    if (previousBase === undefined) delete process.env.OLLAMA_BASE_URL;
+    else process.env.OLLAMA_BASE_URL = previousBase;
+    if (previousModel === undefined) delete process.env.OLLAMA_MODEL;
+    else process.env.OLLAMA_MODEL = previousModel;
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  });
+
+  const result = await generateStructuredText({
+    provider: 'ollama', model: 'qwen3.5:4b', systemInstruction: 'أخرج JSON.', prompt: 'أنشئ موجزاً.', expectJson: true,
+  });
+  assert.equal(result.parsedJson?.ready, true);
+  assert.equal(simulatedDisconnects, 1);
+  assert.equal(requests, 1);
+});

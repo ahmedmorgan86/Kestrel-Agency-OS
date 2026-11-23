@@ -109,6 +109,22 @@ export function MorganProductionView() {
     } finally { setBusy(false); }
   };
 
+  const retryFailedRun = async () => {
+    if (!activeRun) return;
+    setError(null); setNotice(''); setBusy(true);
+    try {
+      const result = await apiRequest<{ runId: string; assignedEmployeeCount: number }>(`/morgan-production/${activeRun.id}/retry`, {
+        method: 'POST', body: {},
+      });
+      setActiveRunId(result.runId);
+      setReviewNote('');
+      setNotice(`أُنشئت جولة بديلة وأُسندت ${result.assignedEmployeeCount} مهام للفريق. لم يُنشر أي محتوى.`);
+      await loadRuns();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'تعذرت إعادة تشغيل الإنتاج.');
+    } finally { setBusy(false); }
+  };
+
   const current = activeRun;
   const deliverable = current?.deliverable || {};
   const content = deliverable.content || {};
@@ -168,7 +184,7 @@ export function MorganProductionView() {
         <Panel title="المراجعة الداخلية"><div className="space-y-2 text-sm"><div className={`font-semibold ${quality.readyForOwner ? 'text-emerald-700' : 'text-amber-700'}`}>{quality.readyForOwner ? 'اجتازت المراجعة الأولية وتنتظر قرارك' : 'لم تجتز مراجعة الجودة'}</div>{[...quality.languageIssues || [], ...quality.unsupportedClaims || [], ...quality.policyRisks || [], ...quality.recommendations || []].map((item: string, index: number) => <p key={index}>• {item}</p>)}{content.factsToVerify?.length > 0 && <p><strong>تحقق قبل الاستخدام:</strong> {content.factsToVerify.join(' · ')}</p>}</div></Panel>
       </>}
 
-      {current.status === 'failed' && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><strong>توقف الإنتاج:</strong> {current.error_message} لا توجد نسخة جاهزة للموافقة.</div>}
+      {current.status === 'failed' && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><div><strong>توقف الإنتاج:</strong> {current.error_message} لا توجد نسخة جاهزة للموافقة.</div>{!(content.title && quality.readyForOwner === false) && <button type="button" disabled={busy || !readiness?.ready} onClick={() => void retryFailedRun()} className={SECONDARY_BTN}><RotateCcw className="h-4 w-4" /> إعادة تشغيل الطلب</button>}</div>}
 
       {current.status === 'owner_review' && <Panel title={quality.readyForOwner ? 'قرارك النهائي' : 'ملاحظات الجودة وإعادة الإنتاج'}><p className="mb-3 text-sm text-slate-600">{quality.readyForOwner ? 'موافقتك تسجل قبول النسخة فقط. النشر الخارجي يظل خطوة منفصلة تتطلب موافقتك الصريحة على المنصة والموعد.' : 'المراجع الداخلي يوصي بعدم قبول هذه النسخة. يمكنك الاطلاع عليها وكتابة توجيهات لجولة إنتاج جديدة؛ يظل القبول مقفولاً حتى تجتاز الجودة.'}</p><textarea value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} rows={3} placeholder={quality.readyForOwner ? 'اكتب ملاحظاتك إذا أردت إعادة الإنتاج' : 'ما الذي تريد تغييره قبل إعادة الإنتاج؟'} className={INPUT_CLASS} /><div className="mt-3 flex flex-wrap gap-2">{quality.readyForOwner && <button type="button" disabled={busy} onClick={() => void decide('accepted')} className={PRIMARY_BTN}><Check className="h-4 w-4" /> أقبل النسخة</button>}<button type="button" disabled={busy || reviewNote.trim().length < 2} onClick={() => void decide('changes_requested')} className={SECONDARY_BTN}><RotateCcw className="h-4 w-4" /> {quality.readyForOwner ? 'أعد الإنتاج بملاحظاتي' : 'ابدأ جولة إنتاج جديدة'}</button></div></Panel>}
       {current.status === 'failed' && content.title && quality.readyForOwner === false && <Panel title="إعادة الإنتاج بعد ملاحظات الجودة"><p className="mb-3 text-sm text-amber-800">أوقف المراجع الداخلي النسخة. يمكنك إضافة توجيهاتك ليستخدمها الفريق في جولة جديدة؛ لا يمكن قبول هذه النسخة.</p><textarea value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} rows={3} placeholder="ما الذي تريد تغييره؟" className={INPUT_CLASS} /><button type="button" disabled={busy || reviewNote.trim().length < 2} onClick={() => void decide('changes_requested')} className={`${SECONDARY_BTN} mt-3`}><RotateCcw className="h-4 w-4" /> ابدأ إعادة الإنتاج</button></Panel>}

@@ -986,6 +986,18 @@ export const MIGRATIONS: Migration[] = [
       ALTER TABLE tasks ADD COLUMN assigned_employee_id TEXT REFERENCES employees(id) ON DELETE SET NULL;
     `,
   },
+  {
+    version: '009',
+    name: 'morgan_group_owner_identity',
+    sql: `
+      ALTER TABLE organizations ADD COLUMN owner_user_id TEXT REFERENCES users(id) ON DELETE SET NULL;
+      UPDATE organizations
+      SET owner_user_id = (
+        SELECT id FROM users WHERE users.organization_id = organizations.id ORDER BY created_at ASC LIMIT 1
+      )
+      WHERE owner_user_id IS NULL;
+    `,
+  },
 ];
 
 function ensureColumn(db: DatabaseSync, table: string, column: string, definition: string): void {

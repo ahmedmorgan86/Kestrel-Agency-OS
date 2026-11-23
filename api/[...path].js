@@ -187,6 +187,20 @@ export default async function handler(req,res){
       const [tasks,decisions]=await Promise.all([p.query('SELECT t.id,t.title,t.status,t.updated_at,e.full_name employee_name FROM morgan_production_tasks t JOIN employees e ON e.id=t.employee_id WHERE t.run_id=$1 ORDER BY t.id',[id]),p.query('SELECT d.version_hash,d.decision,d.comments,d.decided_at,u.full_name reviewer_name FROM morgan_production_decisions d JOIN users u ON u.id=d.decided_by_user_id WHERE d.run_id=$1 ORDER BY d.decided_at DESC',[id])]);
       return respond(res,200,{run:{...run,sources:run.source_items_json,deliverable:run.deliverable_json,tasks:tasks.rows,decisions:decisions.rows}});
     }
+    const productionRetry=path.match(/^morgan-production\/([^/]+)\/retry$/);
+    if(productionRetry&&req.method==='POST'){
+      const owner=(await p.query('SELECT owner_user_id FROM organizations WHERE id=$1',[ORG])).rows[0]?.owner_user_id;
+      if(!owner||user.id!==owner)return respond(res,403,{error:'إعادة تشغيل الإنتاج محجوزة لصاحب الشركة فقط.'});
+      const id=decodeURIComponent(productionRetry[1]);
+      const run=(await p.query('SELECT * FROM morgan_production_runs WHERE id=$1 AND organization_id=$2',[id,ORG])).rows[0];
+      if(!run)return respond(res,404,{error:'طلب الإنتاج غير موجود.'});
+      if(run.status!=='failed')return respond(res,409,{error:'لا يمكن إعادة تشغيل طلب لم يتوقف بسبب مشكلة.'});
+      if(run.deliverable_json?.content?.title&&run.deliverable_json?.qualityReview?.readyForOwner===false)return respond(res,409,{error:'أوقفت مراجعة الجودة هذه النسخة؛ استخدم ملاحظات إعادة الإنتاج بدلاً من إعادة المحاولة التقنية.'});
+      const heartbeat=(await p.query('SELECT healthy,last_seen_at FROM morgan_production_worker WHERE id=$1',[ORG])).rows[0];
+      if(!heartbeat?.healthy||Date.now()-new Date(heartbeat.last_seen_at).getTime()>45000)return respond(res,503,{error:'عامل الإنتاج المحلي غير متصل. لم يبدأ طلب جديد.'});
+      const nextRunId=await createProductionRun(p,{niche:run.niche,audience:run.audience,platform:run.platform,format:run.format,userId:user.id,parentRunId:run.id,iteration:Number(run.iteration)+1});
+      return respond(res,202,{runId:nextRunId,status:'queued',assignedEmployeeCount:productionStaff.length});
+    }
     const productionDecision=path.match(/^morgan-production\/([^/]+)\/decision$/);
     if(productionDecision&&req.method==='POST'){
       const owner=(await p.query('SELECT owner_user_id FROM organizations WHERE id=$1',[ORG])).rows[0]?.owner_user_id;

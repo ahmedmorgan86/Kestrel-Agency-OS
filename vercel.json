@@ -5,6 +5,7 @@
   "rewrites": [
     { "source": "/api/morgan-production/readiness", "destination": "/api/organization?morganRoute=readiness" },
     { "source": "/api/morgan-production/:id/decision", "destination": "/api/organization?morganRoute=:id/decision" },
+    { "source": "/api/morgan-production/:id/retry", "destination": "/api/organization?morganRoute=:id/retry" },
     { "source": "/api/morgan-production/:id", "destination": "/api/organization?morganRoute=:id" },
     { "source": "/api/morgan-production", "destination": "/api/organization?morganRoute=" }
   ]

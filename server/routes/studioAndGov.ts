@@ -667,6 +667,34 @@ studioAndGovRouter.get('/morgan-production/:id', requirePermission('content:read
   } });
 });
 
+studioAndGovRouter.post('/morgan-production/:id/retry', requirePermission('approvals:decide'), async (req: AuthedRequest, res) => {
+  const db = getDb();
+  const owner = db.prepare('SELECT owner_user_id FROM organizations WHERE id=?').get(DEFAULT_ORG_ID) as { owner_user_id: string | null } | undefined;
+  if (!owner?.owner_user_id || owner.owner_user_id !== req.authUser!.id) {
+    return res.status(403).json({ error: 'إعادة تشغيل الإنتاج محجوزة لصاحب الشركة فقط.' });
+  }
+  const run = db.prepare('SELECT * FROM morgan_production_runs WHERE id=? AND organization_id=?')
+    .get(req.params.id, DEFAULT_ORG_ID) as Record<string, unknown> | undefined;
+  if (!run) return res.status(404).json({ error: 'طلب الإنتاج غير موجود.' });
+  if (run.status !== 'failed') return res.status(409).json({ error: 'لا يمكن إعادة تشغيل طلب لم يتوقف بسبب مشكلة.' });
+  let priorDeliverable: Record<string, any> = {};
+  try { priorDeliverable = JSON.parse(String(run.deliverable_json || '{}')); } catch { /* malformed results are retried as failed work */ }
+  if (priorDeliverable.content?.title && priorDeliverable.qualityReview?.readyForOwner === false) {
+    return res.status(409).json({ error: 'أوقفت مراجعة الجودة هذه النسخة؛ استخدم ملاحظات إعادة الإنتاج بدلاً من إعادة المحاولة التقنية.' });
+  }
+  const readiness = await getMorganProductionReadiness();
+  if (!readiness.ready) return res.status(503).json({ error: 'محرك الإنتاج غير جاهز الآن. لم يبدأ طلب جديد.', detail: readiness.error });
+  const nextRunId = createMorganRun({
+    niche: String(run.niche), audience: String(run.audience), platform: String(run.platform), format: String(run.format),
+    userId: req.authUser!.id, parentRunId: String(run.id), iteration: Number(run.iteration) + 1,
+  });
+  writeAuditLog({ db, correlationId: req.correlationId, actorType: 'human', actorId: req.authUser!.id,
+    actorLabel: req.authUser!.email, action: 'morgan.production.retried', entityType: 'morgan_production_run',
+    entityId: nextRunId, metadata: { previousRunId: run.id, previousError: run.error_message },
+  });
+  return res.status(202).json({ runId: nextRunId, status: 'queued', assignedEmployeeCount: MORGAN_PRODUCTION_STAFF.length });
+});
+
 studioAndGovRouter.post('/morgan-production/:id/decision', requirePermission('approvals:decide'), (req: AuthedRequest, res) => {
   const schema = z.object({ decision: z.enum(['accepted', 'changes_requested']), comments: z.string().trim().max(2000).default('') });
   const parsed = schema.safeParse(req.body);
@@ -675,6 +703,10 @@ studioAndGovRouter.post('/morgan-production/:id/decision', requirePermission('ap
     return res.status(400).json({ error: 'اكتب ملاحظاتك المطلوبة لإعادة الإنتاج.' });
   }
   const db = getDb();
+  const owner = db.prepare('SELECT owner_user_id FROM organizations WHERE id=?').get(DEFAULT_ORG_ID) as { owner_user_id: string | null } | undefined;
+  if (!owner?.owner_user_id || owner.owner_user_id !== req.authUser!.id) {
+    return res.status(403).json({ error: 'القرار النهائي للمحتوى محجوز لصاحب الشركة فقط.' });
+  }
   const run = db.prepare('SELECT * FROM morgan_production_runs WHERE id=?').get(req.params.id) as Record<string, unknown> | undefined;
   if (!run) return res.status(404).json({ error: 'طلب الإنتاج غير موجود.' });
   let priorDeliverable: Record<string, any> = {};

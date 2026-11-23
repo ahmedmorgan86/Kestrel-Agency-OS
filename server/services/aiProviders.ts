@@ -101,6 +101,12 @@ async function readOllamaChatStream(response: Response) {
   return { text: text.trim(), promptTokens, outputTokens };
 }
 
+function isRetryableOllamaTransportError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === 'AbortError') return false;
+  const message = error instanceof Error ? error.message : String(error);
+  return /fetch failed|ECONNRESET|EPIPE|socket hang up|other side closed|terminated/i.test(message);
+}
+
 export function isGeminiConfigured(): boolean {
   const key = process.env.GEMINI_API_KEY;
   return Boolean(key && key.trim().length > 10 && !key.startsWith('MY_'));
@@ -176,36 +182,46 @@ export async function generateStructuredText(
     const baseUrl = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
     const started = Date.now();
     const model = req.model || process.env.OLLAMA_MODEL || 'qwen3.5:4b';
-    let response: Response;
-    try {
-      response = await fetch(`${baseUrl}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(Math.max(30, req.timeoutSeconds || getOllamaGenerationTimeoutSeconds()) * 1000),
-        body: JSON.stringify({
-          model,
-          stream: true,
-          think: false,
-          format: req.expectJson ? 'json' : undefined,
-          messages: [
-            { role: 'system', content: req.systemInstruction },
-            { role: 'user', content: req.prompt },
-          ],
-          options: {
-            temperature: req.expectJson ? 0.2 : 0.65,
-            num_predict: Math.max(64, Math.min(1800, Math.floor(req.maxOutputTokens ?? (req.expectJson ? 700 : 900)))),
-          },
-        }),
-      });
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      throw new Error(`Free local AI is unavailable at ${baseUrl}. Start Ollama and install ${model}. (${detail})`);
+    const requestBody = JSON.stringify({
+      model,
+      stream: true,
+      think: false,
+      format: req.expectJson ? 'json' : undefined,
+      messages: [
+        { role: 'system', content: req.systemInstruction },
+        { role: 'user', content: req.prompt },
+      ],
+      options: {
+        temperature: req.expectJson ? 0.2 : 0.65,
+        num_predict: Math.max(64, Math.min(1800, Math.floor(req.maxOutputTokens ?? (req.expectJson ? 700 : 900)))),
+      },
+    });
+    let payload: Awaited<ReturnType<typeof readOllamaChatStream>> | undefined;
+    let lastTransportError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(`${baseUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(Math.max(30, req.timeoutSeconds || getOllamaGenerationTimeoutSeconds()) * 1000),
+          body: requestBody,
+        });
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          throw new Error(`Ollama request failed (${response.status}): ${detail || response.statusText}`);
+        }
+        payload = await readOllamaChatStream(response);
+        break;
+      } catch (error) {
+        if (!isRetryableOllamaTransportError(error)) throw error;
+        lastTransportError = error;
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+      }
     }
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      throw new Error(`Ollama request failed (${response.status}): ${detail || response.statusText}`);
+    if (!payload) {
+      const detail = lastTransportError instanceof Error ? lastTransportError.message : String(lastTransportError);
+      throw new Error(`Free local AI could not complete a connection to ${baseUrl} after 3 attempts. Verify Ollama and ${model}. (${detail})`);
     }
-    const payload = await readOllamaChatStream(response);
     const text = payload.text;
     if (!text) throw new Error(`Local model "${model}" returned an empty response.`);
     return {

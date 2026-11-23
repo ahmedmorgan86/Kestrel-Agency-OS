@@ -6,14 +6,15 @@ import os from 'node:os';
 import path from 'node:path';
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import type { Server } from 'node:http';
+import { createServer, type Server } from 'node:http';
 import { parseNewsRss } from '../server/services/morganProduction';
 import { closeDatabase, initDatabase } from '../server/db/database';
 import { runMigrations } from '../server/db/migrations';
 import { seedSystemConfiguration } from '../server/db/seed';
 import { authAndOrgRouter } from '../server/routes/authAndOrg';
 import { studioAndGovRouter } from '../server/routes/studioAndGov';
-import { attachAuthMiddleware } from '../server/services/auth';
+import { attachAuthMiddleware, createSessionForUser } from '../server/services/auth';
+import { hashPassword } from '../server/services/security';
 
 function productionTestServer(): Server {
   const app = express();
@@ -60,11 +61,17 @@ test('production assigns five specialists and binds owner decisions to the exact
   process.env.SQLITE_DB_PATH = path.join(root, 'private.sqlite');
   process.env.SESSION_SECRET = crypto.randomBytes(32).toString('hex');
   let server: Server | undefined;
+  let ollamaServer: Server | undefined;
+  const previousOllamaUrl = process.env.OLLAMA_BASE_URL;
+  const previousOllamaModel = process.env.OLLAMA_MODEL;
   t.after(async () => {
     if (server) await closeTestServer(server);
+    if (ollamaServer) await closeTestServer(ollamaServer);
     closeDatabase();
     if (oldDb === undefined) delete process.env.SQLITE_DB_PATH; else process.env.SQLITE_DB_PATH = oldDb;
     if (oldSecret === undefined) delete process.env.SESSION_SECRET; else process.env.SESSION_SECRET = oldSecret;
+    if (previousOllamaUrl === undefined) delete process.env.OLLAMA_BASE_URL; else process.env.OLLAMA_BASE_URL = previousOllamaUrl;
+    if (previousOllamaModel === undefined) delete process.env.OLLAMA_MODEL; else process.env.OLLAMA_MODEL = previousOllamaModel;
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -82,6 +89,14 @@ test('production assigns five specialists and binds owner decisions to the exact
   });
   assert.equal(bootstrap.status, 201);
   const { token, user } = await bootstrap.json() as { token: string; user: { id: string } };
+  assert.equal((db.prepare('SELECT owner_user_id FROM organizations WHERE id=?').get('org_kestrel_agency') as { owner_user_id: string }).owner_user_id, user.id);
+
+  const secondUserId = 'usr_morgan_test_non_owner';
+  const ts = new Date().toISOString();
+  db.prepare(`INSERT INTO users(id,organization_id,email,full_name,password_hash,status,created_at,updated_at)
+    VALUES(?,?,?,?,?,'active',?,?)`).run(secondUserId, 'org_kestrel_agency', 'director@morgan.test', 'مدير غير مالك', hashPassword('Non-Owner-Test-Password-4821'), ts, ts);
+  db.prepare('INSERT INTO user_roles(user_id,role_id,assigned_at) VALUES(?,?,?)').run(secondUserId, 'role_super_admin', ts);
+  const nonOwnerSession = createSessionForUser(secondUserId, { ipAddress: '127.0.0.1', userAgent: 'production-test' });
 
   const started = await fetch(`${api}/morgan-production`, {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
@@ -98,6 +113,11 @@ test('production assigns five specialists and binds owner decisions to the exact
   const serialized = JSON.stringify(deliverable);
   const versionHash = crypto.createHash('sha256').update(serialized).digest('hex');
   db.prepare("UPDATE morgan_production_runs SET status='owner_review',deliverable_json=?,version_hash=? WHERE id=?").run(serialized, versionHash, runId);
+  const nonOwnerDecision = await fetch(`${api}/morgan-production/${runId}/decision`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${nonOwnerSession.rawToken}` },
+    body: JSON.stringify({ decision: 'accepted', comments: '' }),
+  });
+  assert.equal(nonOwnerDecision.status, 403, 'a privileged non-owner cannot make the final content decision');
   const accepted = await fetch(`${api}/morgan-production/${runId}/decision`, {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: JSON.stringify({ decision: 'accepted', comments: '' }),
@@ -150,4 +170,35 @@ test('production assigns five specialists and binds owner decisions to the exact
     body: JSON.stringify({ decision: 'changes_requested', comments: 'احذف الادعاء غير الموثق.' }),
   });
   assert.equal(qaRedo.status, 200, 'the owner can request a new round after internal QA rejection');
+
+  ollamaServer = createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ models: [{ name: 'qwen3.5:4b' }] }));
+  });
+  await new Promise<void>((resolve) => ollamaServer!.listen(0, '127.0.0.1', resolve));
+  const ollamaAddress = ollamaServer.address();
+  assert.ok(ollamaAddress && typeof ollamaAddress !== 'string');
+  process.env.OLLAMA_BASE_URL = `http://127.0.0.1:${ollamaAddress.port}`;
+  process.env.OLLAMA_MODEL = 'qwen3.5:4b';
+  const failedStart = await fetch(`${api}/morgan-production`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify({ niche: 'أدوات الإنتاج الإبداعي', audience: 'صناع المحتوى', platform: 'instagram', format: 'reel' }),
+  });
+  const failedRun = await failedStart.json() as { runId: string };
+  db.prepare("UPDATE morgan_production_runs SET status='failed',error_message='تعذر الاتصال مؤقتاً' WHERE id=?").run(failedRun.runId);
+  const nonOwnerRetry = await fetch(`${api}/morgan-production/${failedRun.runId}/retry`, {
+    method: 'POST', headers: { authorization: `Bearer ${nonOwnerSession.rawToken}` },
+  });
+  assert.equal(nonOwnerRetry.status, 403, 'a privileged non-owner cannot requeue a failed production run');
+  const ownerRetry = await fetch(`${api}/morgan-production/${failedRun.runId}/retry`, {
+    method: 'POST', headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(ownerRetry.status, 202);
+  const retryBody = await ownerRetry.json() as { runId: string; assignedEmployeeCount: number };
+  assert.equal(retryBody.assignedEmployeeCount, 5);
+  const retryRun = db.prepare('SELECT parent_run_id,iteration,status FROM morgan_production_runs WHERE id=?').get(retryBody.runId) as { parent_run_id: string; iteration: number; status: string };
+  assert.equal(retryRun.parent_run_id, failedRun.runId);
+  assert.equal(retryRun.iteration, 2);
+  assert.equal(retryRun.status, 'queued');
+  assert.equal((db.prepare('SELECT count(*) count FROM tasks WHERE json_extract(inputs_json, \'$.productionRunId\')=?').get(retryBody.runId) as { count: number }).count, 5);
 });
