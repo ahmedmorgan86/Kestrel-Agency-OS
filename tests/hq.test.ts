@@ -52,6 +52,10 @@ test('deriveHumanOperationalState reflects real employment, meeting, and task st
     'working'
   );
   assert.equal(
+    deriveHumanOperationalState({ employmentStatus: 'active', activeMeetingId: null, runningTaskCount: 0, waitingApprovalTaskCount: 1 }),
+    'waiting_for_approval'
+  );
+  assert.equal(
     deriveHumanOperationalState({ employmentStatus: 'on_leave', activeMeetingId: 'mtg_9', runningTaskCount: 1 }),
     'paused'
   );
@@ -93,7 +97,7 @@ test('computeHqFloorPlan and computeActorWorldPosition place actors in workstati
     [{ id: 'room_board', code: 'exec_boardroom', name: 'Executive Boardroom', capacity: 6 }]
   );
 
-  assert.equal(zones.length, 4); // Reception + 2 departments + 1 meeting room
+  assert.equal(zones.length, 6); // Reception + 2 departments + meeting room + break and approval waiting areas
   const boardroom = zones.find((z) => z.id === 'room_board');
   assert.ok(boardroom);
   assert.equal(boardroom.workstations.length, 6);
@@ -110,6 +114,17 @@ test('computeHqFloorPlan and computeActorWorldPosition place actors in workstati
   );
   assert.equal(meetingPos.zoneId, 'room_board');
   assert.equal(meetingPos.stationCode, 'EXEC_BOARDROOM-S3');
+
+  const breakArea = zones.find((zone) => zone.kind === 'break_area');
+  const approvalWaiting = zones.find((zone) => zone.kind === 'approval_waiting');
+  assert.ok(breakArea && approvalWaiting);
+  assert.equal(breakArea.name, 'استراحة الفريق');
+  const waitingPosition = computeActorWorldPosition(
+    { id: 'employee_1', departmentId: 'dept_copy', slotIndexInDept: 1, activeMeetingRoomId: null, meetingSeatIndex: 0, operationalStatus: 'waiting_for_approval' },
+    zones
+  );
+  assert.equal(waitingPosition.zoneId, approvalWaiting.id);
+  assert.match(waitingPosition.stationCode, /^APPROVAL_WAITING-WS/);
 });
 
 test('buildOrgChartHierarchy groups executives, department managers, human staff, and AI agents', () => {

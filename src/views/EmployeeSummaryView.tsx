@@ -31,6 +31,18 @@ export function EmployeeSummaryView({ employeeId, onBack }: { employeeId: string
       <SectionCard title="زملاء التخصص" description={`أعضاء فريق ${employee.department_name || 'الإنتاج'} `}>
         {coworkers.length ? <div className="divide-y divide-slate-200 dark:divide-slate-800">{coworkers.map((person) => <div key={person.id} className="flex justify-between gap-3 py-3 text-sm"><span className="font-medium">{person.full_name}</span><span className="text-left text-xs text-slate-500">{person.job_title}</span></div>)}</div> : <p className="text-sm text-slate-500">لا يوجد زملاء آخرون في هذا التخصص.</p>}
       </SectionCard>
+      <SectionCard title="المسؤوليات ووصف المظهر" description="بيانات الدور الافتراضي للفريق. الوصف البصري لا يغيّر النماذج ثلاثية الأبعاد الحالية.">
+        <ul className="list-disc space-y-2 pr-5 text-sm text-slate-700 dark:text-slate-300">
+          {(employee.profile?.responsibilities || []).map((responsibility: string) => <li key={responsibility}>{responsibility}</li>)}
+        </ul>
+        {employee.profile?.appearance && <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm leading-7 text-slate-600 dark:bg-slate-950/50 dark:text-slate-300">
+          <div>البشرة: {employee.profile.appearance.skin}</div>
+          <div>الشعر: {employee.profile.appearance.hair}</div>
+          <div>الملابس: {employee.profile.appearance.clothing}</div>
+          <div>البنية: {employee.profile.appearance.build}</div>
+          <div>علامة مميزة: {employee.profile.appearance.distinction}</div>
+        </div>}
+      </SectionCard>
     </div>}
   </div>;
 }

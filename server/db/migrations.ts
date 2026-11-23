@@ -941,6 +941,13 @@ export const MIGRATIONS: Migration[] = [
         AND agent_id IN (SELECT id FROM agents WHERE code IN ('ai_operations_manager','research_agent','strategy_agent','social_media_manager_agent','content_planner_agent','copywriter_agent','creative_director_agent','image_generation_agent','video_production_agent','quality_assurance_agent','publishing_coordinator_agent','analytics_agent','client_success_agent','finance_agent'));
     `,
   },
+  {
+    version: '007',
+    name: 'morgan_virtual_staff_profiles',
+    sql: `
+      ALTER TABLE employees ADD COLUMN profile_json TEXT NOT NULL DEFAULT '{}';
+    `,
+  },
 ];
 
 function ensureColumn(db: DatabaseSync, table: string, column: string, definition: string): void {
