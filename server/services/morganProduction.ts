@@ -190,8 +190,7 @@ export async function processMorganProductionRun(runId: string): Promise<void> {
     const versionHash = createHash('sha256').update(serialized).digest('hex');
     const ready = deliverable.qualityReview.readyForOwner;
     db.prepare('UPDATE morgan_production_runs SET deliverable_json=?, version_hash=?, status=?, error_message=?, updated_at=?, completed_at=? WHERE id=?')
-      .run(serialized, versionHash, ready ? 'owner_review' : 'failed', ready ? '' : 'أوقفت المراجعة الداخلية النسخة. راجع أسباب الجودة وأعد الإنتاج.', nowIso(), nowIso(), runId);
-    if (!ready) throw new Error('أوقفت المراجعة الداخلية النسخة بسبب ملاحظات الجودة.');
+      .run(serialized, versionHash, 'owner_review', ready ? '' : 'مراجعة الجودة توصي بإعادة الإنتاج قبل القبول.', nowIso(), nowIso(), runId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const taskIds = JSON.parse(String(run.task_ids_json || '[]')) as string[];

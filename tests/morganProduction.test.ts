@@ -139,12 +139,12 @@ test('production assigns five specialists and binds owner decisions to the exact
   const qaRun = await qaStart.json() as { runId: string };
   const rejectedDeliverable = JSON.stringify({ content: { title: 'نسخة مرفوضة', caption: 'نص' }, qualityReview: { readyForOwner: false, unsupportedClaims: ['ادعاء بلا مصدر'] } });
   const rejectedHash = crypto.createHash('sha256').update(rejectedDeliverable).digest('hex');
-  db.prepare("UPDATE morgan_production_runs SET status='failed',deliverable_json=?,version_hash=? WHERE id=?").run(rejectedDeliverable, rejectedHash, qaRun.runId);
+  db.prepare("UPDATE morgan_production_runs SET status='owner_review',deliverable_json=?,version_hash=? WHERE id=?").run(rejectedDeliverable, rejectedHash, qaRun.runId);
   const rejectAccepted = await fetch(`${api}/morgan-production/${qaRun.runId}/decision`, {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: JSON.stringify({ decision: 'accepted' }),
   });
-  assert.equal(rejectAccepted.status, 409, 'an internally rejected draft cannot be accepted');
+  assert.equal(rejectAccepted.status, 409, 'an internally rejected draft cannot be accepted even when its deliverable remains visible in owner review');
   const qaRedo = await fetch(`${api}/morgan-production/${qaRun.runId}/decision`, {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: JSON.stringify({ decision: 'changes_requested', comments: 'احذف الادعاء غير الموثق.' }),

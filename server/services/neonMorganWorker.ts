@@ -90,7 +90,7 @@ async function processRun(run: Record<string, any>) {
   await writeTaskResult(run.id, 'آدم زيدان', creative);
   await writeTaskResult(run.id, 'فادي منير', qa);
   const ready = qa.readyForOwner === true;
-  await databasePool().query("UPDATE morgan_production_runs SET deliverable_json=$1,status=$2,error_message=$3,updated_at=now(),completed_at=now() WHERE id=$4", [JSON.stringify(pack), ready ? 'owner_review' : 'failed', ready ? '' : 'أوقفت مراجعة الجودة الداخلية النسخة. راجع ملاحظاتها.', run.id]);
+  await databasePool().query("UPDATE morgan_production_runs SET deliverable_json=$1,status=$2,error_message=$3,updated_at=now(),completed_at=now() WHERE id=$4", [JSON.stringify(pack), 'owner_review', ready ? '' : 'مراجعة الجودة توصي بإعادة الإنتاج قبل القبول.', run.id]);
 }
 
 async function tick() {

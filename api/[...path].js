@@ -190,7 +190,7 @@ export default async function handler(req,res){
       try{
         await client.query('BEGIN');
         run=(await client.query('SELECT * FROM morgan_production_runs WHERE id=$1 AND organization_id=$2 FOR UPDATE',[id,ORG])).rows[0];
-        const internalQaRejected=run?.status==='failed'&&Boolean(run.deliverable_json?.content?.title)&&run.deliverable_json?.qualityReview?.readyForOwner===false;
+        const internalQaRejected=Boolean(run&&['owner_review','failed'].includes(run.status)&&run.deliverable_json?.content?.title)&&run.deliverable_json?.qualityReview?.readyForOwner===false;
         if(!run||!(run.status==='owner_review'||internalQaRejected)){await client.query('ROLLBACK');return respond(res,409,{error:'لا يمكن اتخاذ قرار قبل اكتمال الإنتاج والمراجعة الداخلية.'});}
         if(internalQaRejected&&decision!=='changes_requested'){await client.query('ROLLBACK');return respond(res,409,{error:'أوقفت الجودة الداخلية هذه النسخة؛ يمكنك طلب إعادة إنتاجها فقط.'});}
         const versionHash=createHash('sha256').update(JSON.stringify(run.deliverable_json)).digest('hex');

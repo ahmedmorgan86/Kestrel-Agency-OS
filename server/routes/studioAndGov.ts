@@ -679,7 +679,7 @@ studioAndGovRouter.post('/morgan-production/:id/decision', requirePermission('ap
   if (!run) return res.status(404).json({ error: 'طلب الإنتاج غير موجود.' });
   let priorDeliverable: Record<string, any> = {};
   try { priorDeliverable = JSON.parse(String(run.deliverable_json || '{}')); } catch { /* malformed runs cannot enter review */ }
-  const internalQaRejected = run.status === 'failed' && Boolean(priorDeliverable.content?.title) && priorDeliverable.qualityReview?.readyForOwner === false;
+  const internalQaRejected = (run.status === 'owner_review' || run.status === 'failed') && Boolean(priorDeliverable.content?.title) && priorDeliverable.qualityReview?.readyForOwner === false;
   if (run.status !== 'owner_review' && !internalQaRejected) return res.status(409).json({ error: 'لا يمكن اتخاذ قرار قبل اكتمال الإنتاج والمراجعة الداخلية.' });
   if (internalQaRejected && parsed.data.decision !== 'changes_requested') return res.status(409).json({ error: 'أوقفت الجودة الداخلية هذه النسخة؛ يمكنك طلب إعادة إنتاجها فقط.' });
   const ts = nowIso();
