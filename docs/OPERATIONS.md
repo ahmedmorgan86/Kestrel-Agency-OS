@@ -10,6 +10,7 @@ Copy `.env.example` to `.env` (or configure secrets in your hosting platform):
 - `CREDENTIAL_ENCRYPTION_KEY` — Required in production; independent random secret with at least 32 characters for OAuth token encryption.
 - `OLLAMA_BASE_URL` — Local Ollama endpoint (defaults to `http://127.0.0.1:11434`).
 - `OLLAMA_MODEL` — Locally installed model (defaults to `qwen3.5:4b`).
+- `OLLAMA_GENERATION_TIMEOUT_SECONDS` — Per-specialist local model timeout; defaults to 900 seconds and is clamped between 60 and 1800 seconds for slower CPU inference.
 - Optional `GEMINI_API_KEY` — Google AI Studio cloud free tier; separate key, quotas, and provider terms apply.
 - Optional Social OAuth Apps: `META_APP_ID` / `META_APP_SECRET`, `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET`, `X_CLIENT_ID` / `X_CLIENT_SECRET`, `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET`, `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`.
 

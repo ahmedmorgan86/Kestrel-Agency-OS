@@ -14,6 +14,7 @@ export interface TextGenerationRequest {
   expectJson?: boolean;
   useGoogleSearch?: boolean;
   timeoutSeconds?: number;
+  maxOutputTokens?: number;
 }
 
 export interface TextGenerationResult {
@@ -50,6 +51,54 @@ export interface VideoGenerationRequest {
   prompt: string;
   aspectRatio: string;
   durationSeconds: number;
+}
+
+export function getOllamaGenerationTimeoutSeconds(): number {
+  const configured = Number(process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS || 900);
+  if (!Number.isFinite(configured)) return 900;
+  return Math.max(60, Math.min(1800, Math.floor(configured)));
+}
+
+async function readOllamaChatStream(response: Response) {
+  if (!response.body) throw new Error('Ollama returned an empty response body.');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = '';
+  let text = '';
+  let promptTokens = 0;
+  let outputTokens = 0;
+  const consume = (line: string) => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line) as {
+      error?: string;
+      message?: { content?: string };
+      prompt_eval_count?: number;
+      eval_count?: number;
+    };
+    if (event.error) throw new Error(event.error);
+    text += event.message?.content || '';
+    promptTokens = event.prompt_eval_count ?? promptTokens;
+    outputTokens = event.eval_count ?? outputTokens;
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      pending += decoder.decode(value, { stream: !done });
+      let newline = pending.indexOf('\n');
+      while (newline >= 0) {
+        consume(pending.slice(0, newline));
+        pending = pending.slice(newline + 1);
+        newline = pending.indexOf('\n');
+      }
+      if (done) break;
+    }
+    consume(pending);
+  } finally {
+    reader.releaseLock();
+  }
+
+  return { text: text.trim(), promptTokens, outputTokens };
 }
 
 export function isGeminiConfigured(): boolean {
@@ -132,33 +181,32 @@ export async function generateStructuredText(
       response = await fetch(`${baseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(Math.max(30, req.timeoutSeconds || 180) * 1000),
+        signal: AbortSignal.timeout(Math.max(30, req.timeoutSeconds || getOllamaGenerationTimeoutSeconds()) * 1000),
         body: JSON.stringify({
           model,
-          stream: false,
+          stream: true,
           think: false,
           format: req.expectJson ? 'json' : undefined,
           messages: [
             { role: 'system', content: req.systemInstruction },
             { role: 'user', content: req.prompt },
           ],
-          options: { temperature: req.expectJson ? 0.2 : 0.65 },
+          options: {
+            temperature: req.expectJson ? 0.2 : 0.65,
+            num_predict: Math.max(64, Math.min(1800, Math.floor(req.maxOutputTokens ?? (req.expectJson ? 700 : 900)))),
+          },
         }),
       });
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       throw new Error(`Free local AI is unavailable at ${baseUrl}. Start Ollama and install ${model}. (${detail})`);
     }
-    const payload = (await response.json().catch(() => ({}))) as {
-      error?: string;
-      message?: { content?: string };
-      prompt_eval_count?: number;
-      eval_count?: number;
-    };
     if (!response.ok) {
-      throw new Error(`Ollama request failed (${response.status}): ${payload.error || response.statusText}`);
+      const detail = await response.text().catch(() => '');
+      throw new Error(`Ollama request failed (${response.status}): ${detail || response.statusText}`);
     }
-    const text = (payload.message?.content || '').trim();
+    const payload = await readOllamaChatStream(response);
+    const text = payload.text;
     if (!text) throw new Error(`Local model "${model}" returned an empty response.`);
     return {
       provider: 'ollama',
@@ -166,8 +214,8 @@ export async function generateStructuredText(
       text,
       parsedJson: tryExtractJson(text),
       groundedSources: [],
-      promptTokens: payload.prompt_eval_count || 0,
-      outputTokens: payload.eval_count || 0,
+      promptTokens: payload.promptTokens,
+      outputTokens: payload.outputTokens,
       latencyMs: Date.now() - started,
       costUsd: 0,
       rateCardFound: true,
