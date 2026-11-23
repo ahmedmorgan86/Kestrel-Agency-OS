@@ -25,8 +25,45 @@ import {
 } from '../services/storage';
 import { dispatchRealVideoGeneration, generateRealImage } from '../services/aiProviders';
 import { cancelBackgroundJob, enqueueBackgroundJob } from '../services/worker';
+import { getMorganProductionReadiness } from '../services/morganProduction';
+import { selectMorganProductionTeam } from '../../shared/morganProductionTeam.js';
 
 export const studioAndGovRouter = Router();
+
+function createMorganRun(input: {
+  niche: string; audience: string; platform: string; format: string; userId: string;
+  parentRunId?: string | null; iteration?: number; reviewNote?: string;
+}): string {
+  const db = getDb();
+  const id = generateId('mrun');
+  const ts = nowIso();
+  const taskIds: string[] = [];
+  const productionTeam = selectMorganProductionTeam(input);
+  db.prepare(`INSERT INTO morgan_production_runs
+    (id, organization_id, niche, audience, platform, format, status, parent_run_id, review_note, iteration, created_by_user_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)`)
+    .run(id, DEFAULT_ORG_ID, input.niche, input.audience, input.platform, input.format,
+      input.parentRunId ?? null, input.reviewNote ?? '', input.iteration ?? 1, input.userId, ts, ts);
+  for (const member of productionTeam) {
+    const employee = db.prepare('SELECT id, department_id FROM employees WHERE full_name = ? AND employment_status = \'active\'')
+      .get(member.name) as { id: string; department_id: string | null } | undefined;
+    if (!employee) throw new Error(`موظف سير الإنتاج غير موجود: ${member.name}`);
+    if (!employee.id.startsWith('employee_virtual_')) throw new Error(`لا يمكن إسناد الإنتاج إلى حساب بشري: ${member.name}`);
+    const taskId = generateId('task');
+    db.prepare(`INSERT INTO tasks (id, organization_id, title, description, task_type, department_id, assigned_employee_id, priority, status, inputs_json, created_by_user_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'content_production', ?, ?, 'high', 'queued', ?, ?, ?, ?)`)
+      .run(taskId, DEFAULT_ORG_ID, member.title, `إنتاج ${input.format} عن ${input.niche} لمنصة ${input.platform}`,
+        employee.department_id, employee.id, JSON.stringify({ productionRunId: id }), input.userId, ts, ts);
+    taskIds.push(taskId);
+  }
+  db.prepare('UPDATE morgan_production_runs SET task_ids_json=? WHERE id=?').run(JSON.stringify(taskIds), id);
+  enqueueBackgroundJob({
+    jobType: 'morgan_content_pipeline',
+    payload: { runId: id },
+    idempotencyKey: `morgan-production:${id}`,
+  });
+  return id;
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -566,6 +603,135 @@ studioAndGovRouter.post('/approvals/:id/decide', requirePermission('approvals:de
   });
 
   res.status(201).json({ decisionId, status: parsed.data.decision, versionHash: approvalReq.version_hash });
+});
+
+// --- PRIVATE MORGAN GROUP AUTOMATED CONTENT PRODUCTION ---
+studioAndGovRouter.get('/morgan-production/readiness', requirePermission('content:read'), async (_req, res) => {
+  res.json(await getMorganProductionReadiness());
+});
+
+studioAndGovRouter.get('/morgan-production', requirePermission('content:read'), (_req, res) => {
+  const db = getDb();
+  const rows = db.prepare('SELECT * FROM morgan_production_runs ORDER BY created_at DESC LIMIT 40').all() as Array<Record<string, unknown>>;
+  res.json({ runs: rows.map((row) => ({
+    ...row,
+    sources: JSON.parse(String(row.source_items_json || '[]')),
+    deliverable: JSON.parse(String(row.deliverable_json || '{}')),
+    taskIds: JSON.parse(String(row.task_ids_json || '[]')),
+  })) });
+});
+
+studioAndGovRouter.post('/morgan-production', requirePermission('content:write'), (req: AuthedRequest, res) => {
+  const schema = z.object({
+    niche: z.string().trim().min(3, 'اكتب المجال الذي تريد صناعة المحتوى عنه.').max(180),
+    audience: z.string().trim().max(300).default(''),
+    platform: z.enum(['instagram', 'tiktok', 'youtube', 'facebook', 'linkedin']),
+    format: z.enum(['reel', 'short_video', 'carousel', 'post', 'thread']),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message || 'بيانات التشغيل غير مكتملة.' });
+  try {
+    const runId = createMorganRun({ ...parsed.data, userId: req.authUser!.id });
+    writeAuditLog({
+      db: getDb(), correlationId: req.correlationId, actorType: 'human', actorId: req.authUser!.id,
+      actorLabel: req.authUser!.email, action: 'morgan.production.started', entityType: 'morgan_production_run',
+      entityId: runId, metadata: { niche: parsed.data.niche, platform: parsed.data.platform, format: parsed.data.format },
+    });
+    res.status(202).json({ runId, status: 'queued', assignedEmployeeCount: selectMorganProductionTeam(parsed.data).length });
+  } catch (error) {
+    res.status(503).json({ error: error instanceof Error ? error.message : 'تعذر بدء الإنتاج.' });
+  }
+});
+
+studioAndGovRouter.get('/morgan-production/:id', requirePermission('content:read'), (req, res) => {
+  const db = getDb();
+  const run = db.prepare('SELECT * FROM morgan_production_runs WHERE id=?').get(req.params.id) as Record<string, unknown> | undefined;
+  if (!run) return res.status(404).json({ error: 'طلب الإنتاج غير موجود.' });
+  const taskIds = JSON.parse(String(run.task_ids_json || '[]')) as string[];
+  const tasks = taskIds.length ? db.prepare(`SELECT t.id,t.title,t.status,t.updated_at,e.full_name employee_name
+      FROM tasks t LEFT JOIN employees e ON e.id=t.assigned_employee_id WHERE t.id IN (${taskIds.map(() => '?').join(',')}) ORDER BY t.created_at`)
+    .all(...taskIds) : [];
+  const decisions = db.prepare(`SELECT d.decision,d.version_hash,d.comments,d.decided_by_user_id,d.decided_at,u.full_name reviewer_name
+      FROM morgan_production_decisions d LEFT JOIN users u ON u.id=d.decided_by_user_id WHERE d.run_id=? ORDER BY d.decided_at DESC`).all(req.params.id);
+  res.json({ run: {
+    ...run,
+    sources: JSON.parse(String(run.source_items_json || '[]')),
+    deliverable: JSON.parse(String(run.deliverable_json || '{}')),
+    tasks,
+    decisions,
+  } });
+});
+
+studioAndGovRouter.post('/morgan-production/:id/retry', requirePermission('approvals:decide'), async (req: AuthedRequest, res) => {
+  const db = getDb();
+  const owner = db.prepare('SELECT owner_user_id FROM organizations WHERE id=?').get(DEFAULT_ORG_ID) as { owner_user_id: string | null } | undefined;
+  if (!owner?.owner_user_id || owner.owner_user_id !== req.authUser!.id) {
+    return res.status(403).json({ error: 'إعادة تشغيل الإنتاج محجوزة لصاحب الشركة فقط.' });
+  }
+  const run = db.prepare('SELECT * FROM morgan_production_runs WHERE id=? AND organization_id=?')
+    .get(req.params.id, DEFAULT_ORG_ID) as Record<string, unknown> | undefined;
+  if (!run) return res.status(404).json({ error: 'طلب الإنتاج غير موجود.' });
+  if (run.status !== 'failed') return res.status(409).json({ error: 'لا يمكن إعادة تشغيل طلب لم يتوقف بسبب مشكلة.' });
+  let priorDeliverable: Record<string, any> = {};
+  try { priorDeliverable = JSON.parse(String(run.deliverable_json || '{}')); } catch { /* malformed results are retried as failed work */ }
+  if (priorDeliverable.content?.title && priorDeliverable.qualityReview?.readyForOwner === false) {
+    return res.status(409).json({ error: 'أوقفت مراجعة الجودة هذه النسخة؛ استخدم ملاحظات إعادة الإنتاج بدلاً من إعادة المحاولة التقنية.' });
+  }
+  const readiness = await getMorganProductionReadiness();
+  if (!readiness.ready) return res.status(503).json({ error: 'محرك الإنتاج غير جاهز الآن. لم يبدأ طلب جديد.', detail: readiness.error });
+  const nextRunId = createMorganRun({
+    niche: String(run.niche), audience: String(run.audience), platform: String(run.platform), format: String(run.format),
+    userId: req.authUser!.id, parentRunId: String(run.id), iteration: Number(run.iteration) + 1,
+  });
+  writeAuditLog({ db, correlationId: req.correlationId, actorType: 'human', actorId: req.authUser!.id,
+    actorLabel: req.authUser!.email, action: 'morgan.production.retried', entityType: 'morgan_production_run',
+    entityId: nextRunId, metadata: { previousRunId: run.id, previousError: run.error_message },
+  });
+  return res.status(202).json({ runId: nextRunId, status: 'queued', assignedEmployeeCount: selectMorganProductionTeam({ niche: String(run.niche), platform: String(run.platform), format: String(run.format) }).length });
+});
+
+studioAndGovRouter.post('/morgan-production/:id/decision', requirePermission('approvals:decide'), (req: AuthedRequest, res) => {
+  const schema = z.object({ decision: z.enum(['accepted', 'changes_requested']), comments: z.string().trim().max(2000).default('') });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'اختر القبول أو طلب إعادة الإنتاج.' });
+  if (parsed.data.decision === 'changes_requested' && parsed.data.comments.length < 2) {
+    return res.status(400).json({ error: 'اكتب ملاحظاتك المطلوبة لإعادة الإنتاج.' });
+  }
+  const db = getDb();
+  const owner = db.prepare('SELECT owner_user_id FROM organizations WHERE id=?').get(DEFAULT_ORG_ID) as { owner_user_id: string | null } | undefined;
+  if (!owner?.owner_user_id || owner.owner_user_id !== req.authUser!.id) {
+    return res.status(403).json({ error: 'القرار النهائي للمحتوى محجوز لصاحب الشركة فقط.' });
+  }
+  const run = db.prepare('SELECT * FROM morgan_production_runs WHERE id=?').get(req.params.id) as Record<string, unknown> | undefined;
+  if (!run) return res.status(404).json({ error: 'طلب الإنتاج غير موجود.' });
+  let priorDeliverable: Record<string, any> = {};
+  try { priorDeliverable = JSON.parse(String(run.deliverable_json || '{}')); } catch { /* malformed runs cannot enter review */ }
+  const internalQaRejected = (run.status === 'owner_review' || run.status === 'failed') && Boolean(priorDeliverable.content?.title) && priorDeliverable.qualityReview?.readyForOwner === false;
+  if (run.status !== 'owner_review' && !internalQaRejected) return res.status(409).json({ error: 'لا يمكن اتخاذ قرار قبل اكتمال الإنتاج والمراجعة الداخلية.' });
+  if (internalQaRejected && parsed.data.decision !== 'changes_requested') return res.status(409).json({ error: 'أوقفت الجودة الداخلية هذه النسخة؛ يمكنك طلب إعادة إنتاجها فقط.' });
+  const ts = nowIso();
+  if (parsed.data.decision === 'accepted') {
+    db.prepare("UPDATE morgan_production_runs SET status='accepted', review_note=?, updated_at=? WHERE id=?")
+      .run(parsed.data.comments, ts, String(run.id));
+  } else {
+    db.prepare("UPDATE morgan_production_runs SET status='changes_requested', review_note=?, updated_at=? WHERE id=?")
+      .run(parsed.data.comments, ts, String(run.id));
+  }
+  db.prepare(`INSERT INTO morgan_production_decisions (id,run_id,version_hash,decision,comments,decided_by_user_id,decided_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .run(generateId('mpd'), String(run.id), String(run.version_hash), parsed.data.decision, parsed.data.comments, req.authUser!.id, ts);
+  writeAuditLog({ db, correlationId: req.correlationId, actorType: 'human', actorId: req.authUser!.id,
+    actorLabel: req.authUser!.email, action: `morgan.production.${parsed.data.decision}`, entityType: 'morgan_production_run',
+    entityId: String(run.id), metadata: { iteration: run.iteration, comments: parsed.data.comments, deliverable: run.deliverable_json },
+  });
+  let nextRunId: string | undefined;
+  if (parsed.data.decision === 'changes_requested') {
+    nextRunId = createMorganRun({
+      niche: String(run.niche), audience: String(run.audience), platform: String(run.platform), format: String(run.format),
+      userId: req.authUser!.id, parentRunId: String(run.id), iteration: Number(run.iteration) + 1, reviewNote: parsed.data.comments,
+    });
+  }
+  res.json({ decision: parsed.data.decision, nextRunId });
 });
 
 // --- ASSET LIBRARY & SIGNED FILE STORAGE ---

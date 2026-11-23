@@ -14,6 +14,7 @@ export interface TextGenerationRequest {
   expectJson?: boolean;
   useGoogleSearch?: boolean;
   timeoutSeconds?: number;
+  maxOutputTokens?: number;
 }
 
 export interface TextGenerationResult {
@@ -50,6 +51,71 @@ export interface VideoGenerationRequest {
   prompt: string;
   aspectRatio: string;
   durationSeconds: number;
+}
+
+export function getOllamaGenerationTimeoutSeconds(): number {
+  const configured = Number(process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS || 900);
+  if (!Number.isFinite(configured)) return 900;
+  return Math.max(60, Math.min(1800, Math.floor(configured)));
+}
+
+export function getOllamaNumThreads(): number {
+  const configured = Number(process.env.OLLAMA_NUM_THREADS || 4);
+  if (!Number.isFinite(configured)) return 4;
+  return Math.max(1, Math.min(8, Math.floor(configured)));
+}
+
+export function getOllamaKeepAlive(): string {
+  const configured = process.env.OLLAMA_KEEP_ALIVE?.trim();
+  return configured && configured.length <= 32 ? configured : '60s';
+}
+
+async function readOllamaChatStream(response: Response) {
+  if (!response.body) throw new Error('Ollama returned an empty response body.');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = '';
+  let text = '';
+  let promptTokens = 0;
+  let outputTokens = 0;
+  const consume = (line: string) => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line) as {
+      error?: string;
+      message?: { content?: string };
+      prompt_eval_count?: number;
+      eval_count?: number;
+    };
+    if (event.error) throw new Error(event.error);
+    text += event.message?.content || '';
+    promptTokens = event.prompt_eval_count ?? promptTokens;
+    outputTokens = event.eval_count ?? outputTokens;
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      pending += decoder.decode(value, { stream: !done });
+      let newline = pending.indexOf('\n');
+      while (newline >= 0) {
+        consume(pending.slice(0, newline));
+        pending = pending.slice(newline + 1);
+        newline = pending.indexOf('\n');
+      }
+      if (done) break;
+    }
+    consume(pending);
+  } finally {
+    reader.releaseLock();
+  }
+
+  return { text: text.trim(), promptTokens, outputTokens };
+}
+
+function isRetryableOllamaTransportError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === 'AbortError') return false;
+  const message = error instanceof Error ? error.message : String(error);
+  return /fetch failed|ECONNRESET|EPIPE|socket hang up|other side closed|terminated/i.test(message);
 }
 
 export function isGeminiConfigured(): boolean {
@@ -127,38 +193,51 @@ export async function generateStructuredText(
     const baseUrl = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
     const started = Date.now();
     const model = req.model || process.env.OLLAMA_MODEL || 'qwen3.5:4b';
-    let response: Response;
-    try {
-      response = await fetch(`${baseUrl}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(Math.max(30, req.timeoutSeconds || 180) * 1000),
-        body: JSON.stringify({
-          model,
-          stream: false,
-          think: false,
-          format: req.expectJson ? 'json' : undefined,
-          messages: [
-            { role: 'system', content: req.systemInstruction },
-            { role: 'user', content: req.prompt },
-          ],
-          options: { temperature: req.expectJson ? 0.2 : 0.65 },
-        }),
-      });
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      throw new Error(`Free local AI is unavailable at ${baseUrl}. Start Ollama and install ${model}. (${detail})`);
+    const requestBody = JSON.stringify({
+      model,
+      stream: true,
+      think: false,
+      keep_alive: getOllamaKeepAlive(),
+      format: req.expectJson ? 'json' : undefined,
+      messages: [
+        { role: 'system', content: req.systemInstruction },
+        { role: 'user', content: req.prompt },
+      ],
+      options: {
+        temperature: req.expectJson ? 0.2 : 0.65,
+        // Cap CPU contention on the owner's 8-core desktop without changing model,
+        // context window, or sampling settings. This affects throughput only.
+        num_thread: getOllamaNumThreads(),
+        num_predict: Math.max(64, Math.min(1800, Math.floor(req.maxOutputTokens ?? (req.expectJson ? 700 : 900)))),
+      },
+    });
+    let payload: Awaited<ReturnType<typeof readOllamaChatStream>> | undefined;
+    let lastTransportError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(`${baseUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(Math.max(30, req.timeoutSeconds || getOllamaGenerationTimeoutSeconds()) * 1000),
+          body: requestBody,
+        });
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          throw new Error(`Ollama request failed (${response.status}): ${detail || response.statusText}`);
+        }
+        payload = await readOllamaChatStream(response);
+        break;
+      } catch (error) {
+        if (!isRetryableOllamaTransportError(error)) throw error;
+        lastTransportError = error;
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+      }
     }
-    const payload = (await response.json().catch(() => ({}))) as {
-      error?: string;
-      message?: { content?: string };
-      prompt_eval_count?: number;
-      eval_count?: number;
-    };
-    if (!response.ok) {
-      throw new Error(`Ollama request failed (${response.status}): ${payload.error || response.statusText}`);
+    if (!payload) {
+      const detail = lastTransportError instanceof Error ? lastTransportError.message : String(lastTransportError);
+      throw new Error(`Free local AI could not complete a connection to ${baseUrl} after 3 attempts. Verify Ollama and ${model}. (${detail})`);
     }
-    const text = (payload.message?.content || '').trim();
+    const text = payload.text;
     if (!text) throw new Error(`Local model "${model}" returned an empty response.`);
     return {
       provider: 'ollama',
@@ -166,8 +245,8 @@ export async function generateStructuredText(
       text,
       parsedJson: tryExtractJson(text),
       groundedSources: [],
-      promptTokens: payload.prompt_eval_count || 0,
-      outputTokens: payload.eval_count || 0,
+      promptTokens: payload.promptTokens,
+      outputTokens: payload.outputTokens,
       latencyMs: Date.now() - started,
       costUsd: 0,
       rateCardFound: true,

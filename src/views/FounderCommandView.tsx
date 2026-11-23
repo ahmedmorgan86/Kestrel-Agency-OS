@@ -57,7 +57,7 @@ export function FounderCommandView({ onNavigate }: { onNavigate: (route: string)
     </div>
     <div className="grid gap-3 sm:grid-cols-3">
       {[
-        { label: 'إنتاج محتوى جديد', detail: 'مسودة لمنصات التواصل', route: 'content', icon: FilePlus2 },
+        { label: 'تشغيل إنتاج المحتوى', detail: 'بحث ومهام ومراجعة المالك', route: 'production', icon: FilePlus2 },
         { label: 'اجتماع فريق', detail: `${activeMeetingCount} اجتماعات جارية`, route: 'meetings', icon: Video },
         { label: 'أكاديمية الفريق', detail: 'مواد تدريبية داخلية', route: 'academy', icon: BookOpenCheck },
       ].map(({ label, detail, route, icon: Icon }) => <button key={route} type="button" onClick={() => onNavigate(route)} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-right transition hover:border-blue-400 dark:border-slate-800 dark:bg-slate-900"><span className="rounded-lg bg-blue-50 p-2 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"><Icon className="h-5 w-5" /></span><span><span className="block font-semibold">{label}</span><span className="text-xs text-slate-500">{detail}</span></span><ArrowLeft className="mr-auto h-4 w-4 text-slate-400" /></button>)}

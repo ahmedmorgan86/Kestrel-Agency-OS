@@ -21,6 +21,7 @@ test('database migrations, honest system config seed, auth bootstrap, credential
   assert.ok(applied.includes('004_morgan_group_identity'));
   assert.ok(applied.includes('005_morgan_technology_company_departments'));
   assert.ok(applied.includes('006_free_local_ai_defaults'));
+  assert.ok(applied.includes('007_morgan_virtual_staff_profiles'));
 
   // Seed is idempotent, and the virtual workforce is clearly separate from client and activity data.
   seedSystemConfiguration(db);
@@ -41,10 +42,46 @@ test('database migrations, honest system config seed, auth bootstrap, credential
 
   assert.equal(deptCount, 13);
   assert.equal(meetingRoomCount, 4);
+  assert.equal((db.prepare("SELECT name FROM meeting_rooms WHERE id = 'room_strategy_war_room'").get() as { name: string }).name, 'الاجتماع التحريري اليومي');
   assert.equal(agentCount, 14);
   const localAgentCount = (db.prepare("SELECT COUNT(*) as c FROM agents WHERE model_provider = 'ollama' AND model_identifier = 'qwen3.5:4b'").get() as { c: number }).c;
   assert.equal(localAgentCount, 14, 'The AI workforce uses the free local model by default');
   assert.equal(employeeCount, 30, 'The virtual company starts with 30 fictional, login-free employees');
+  const roster = db.prepare(`SELECT id, user_id, full_name, email, job_title, manager_employee_id, profile_json
+                             FROM employees WHERE id LIKE 'employee_virtual_%' ORDER BY id`).all() as Array<{
+    id: string; user_id: string | null; full_name: string; email: string; job_title: string;
+    manager_employee_id: string | null; profile_json: string;
+  }>;
+  assert.equal(roster.length, 30);
+  assert.deepEqual(roster.map((employee) => employee.full_name), [
+    'سلمى الحداد', 'كريم النجار', 'ليلى منصور', 'عمر فهمي', 'هبة السيد', 'ياسر عبدالله', 'نورا خليل', 'طارق مصطفى', 'دينا رمضان', 'مازن حسن',
+    'رنا العلي', 'إياد صالح', 'سارة جمال', 'آدم زيدان', 'مريم شريف', 'بلال عيسى', 'جنى فوزي', 'هشام رأفت', 'لمى سعيد', 'وليد المصري',
+    'آية كمال', 'زياد عادل', 'ملك ناصر', 'فادي منير', 'هدى بكر', 'أنس الشاذلي', 'روان عثمان', 'كنان رفعت', 'جود حمدي', 'سيف البدري',
+  ]);
+  assert.ok(roster.every((employee) => employee.user_id === null && employee.email.endsWith('@morgangroup.example')));
+  assert.ok(roster.every((employee) => JSON.parse(employee.profile_json).profileType === 'ai_agent'), 'All 30 virtual profiles are AI agents, while owner authentication remains human-only');
+  const hairDescriptions = new Set<string>();
+  assert.ok(roster.every((employee) => {
+    const profile = JSON.parse(employee.profile_json) as { responsibilities?: unknown[]; appearance?: Record<string, unknown> };
+    hairDescriptions.add(String(profile.appearance?.hair || ''));
+    return (profile.responsibilities?.length ?? 0) >= 2 && Boolean(profile.appearance?.skin && profile.appearance?.hair && profile.appearance?.clothing && profile.appearance?.build);
+  }), 'Every fictional employee has a specialty profile, responsibilities, and appearance description');
+  assert.ok(hairDescriptions.size >= 20, 'Appearance descriptions must vary across the virtual team');
+  assert.equal(roster[4]?.manager_employee_id, 'employee_virtual_02', 'The editor reports to the content director');
+  assert.equal(roster[9]?.manager_employee_id, 'employee_virtual_05', 'The script writer reports to the editor');
+  const rosterIds = new Set(roster.map((employee) => employee.id));
+  for (const employee of roster) {
+    const visited = new Set([employee.id]);
+    let managerId = employee.manager_employee_id;
+    while (managerId && rosterIds.has(managerId)) {
+      assert.ok(!visited.has(managerId), `No reporting cycle may include ${employee.full_name}`);
+      visited.add(managerId);
+      managerId = roster.find((candidate) => candidate.id === managerId)?.manager_employee_id ?? null;
+    }
+    if (managerId) {
+      assert.ok(db.prepare('SELECT id FROM employees WHERE id = ?').get(managerId), `Manager ${managerId} must exist`);
+    }
+  }
   assert.equal(courseCount, 4, 'The academy catalog is seeded with its learning paths');
   assert.equal(enrollmentCount, 0, 'No learning completions or enrollments are fabricated');
   const organization = db.prepare('SELECT name, tagline, brand_symbol FROM organizations WHERE id = ?').get('org_kestrel_agency') as { name: string; tagline: string; brand_symbol: string };
@@ -69,7 +106,7 @@ test('database migrations, honest system config seed, auth bootstrap, credential
   assert.equal(runCount, 0, 'Production seed must contain zero fabricated agent executions');
   assert.ok(supaInteg, 'Supabase integration must be seeded');
   assert.ok(db.prepare("SELECT id FROM integrations WHERE provider_code = 'ollama'").get(), 'Ollama local provider must be available without an API key');
-  assert.equal((db.prepare("SELECT name FROM departments WHERE code = 'quality_assurance'").get() as { name: string }).name, 'Quality Engineering');
+  assert.equal((db.prepare("SELECT name FROM departments WHERE code = 'quality_assurance'").get() as { name: string }).name, 'الجودة والموافقات');
 
   const prevUrl = process.env.SUPABASE_URL;
   const prevKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -89,6 +126,13 @@ test('database migrations, honest system config seed, auth bootstrap, credential
   });
   assert.ok(admin.roles.includes('super_admin'));
   assert.ok(admin.permissions.includes('approvals:decide'));
+  seedSystemConfiguration(db);
+  const adminEmployee = db.prepare('SELECT id FROM employees WHERE user_id = ?').get(admin.id) as { id: string };
+  assert.equal(
+    (db.prepare("SELECT manager_employee_id FROM employees WHERE id = 'employee_virtual_01'").get() as { manager_employee_id: string }).manager_employee_id,
+    adminEmployee.id,
+    'The operations director reports to the authenticated owner after owner setup'
+  );
 
   assert.equal(authenticateCredentials('ada@kestrel.internal', 'WrongPassword'), null);
   const authed = authenticateCredentials('ada@kestrel.internal', 'StrongPassword123!');

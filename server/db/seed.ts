@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { MORGAN_VIRTUAL_ROSTER } from '../../shared/virtualRoster.js';
 import { getDefaultDepartmentColor } from '../../src/domain/hq';
 import { nowIso } from './database';
 import { ALL_PERMISSIONS, SYSTEM_ROLE_PERMISSIONS } from '../../src/domain/rbac';
@@ -7,89 +8,105 @@ import { ALL_PERMISSIONS, SYSTEM_ROLE_PERMISSIONS } from '../../src/domain/rbac'
 export const DEFAULT_ORG_ID = 'org_kestrel_agency';
 
 const DEPARTMENTS = [
-  { code: 'executive', name: 'Executive Leadership', description: 'Company leadership, governance, and decision oversight.' },
-  { code: 'strategy_research', name: 'Research and Intelligence', description: 'Technology research, market intelligence, and strategic planning.' },
-  { code: 'social_media_mgmt', name: 'Digital Products and Platforms', description: 'Digital product delivery, platform engineering, and service operations.' },
-  { code: 'content_planning', name: 'Product Management', description: 'Product strategy, roadmaps, discovery, and delivery.' },
-  { code: 'content_copywriting', name: 'Product Writing and Documentation', description: 'Product language, technical documentation, and knowledge systems.' },
-  { code: 'creative_direction', name: 'Experience Design', description: 'Human centered product design and interaction systems.' },
-  { code: 'graphic_design', name: 'Visual and Brand Design', description: 'Visual systems, product interfaces, and company identity.' },
-  { code: 'video_production', name: 'Media and Prototyping Lab', description: 'Interactive prototypes, demos, and product storytelling.' },
-  { code: 'quality_assurance', name: 'Quality Engineering', description: 'Software quality, validation, reliability, and release readiness.' },
-  { code: 'client_success', name: 'Customer Success', description: 'Customer outcomes, product enablement, and support operations.' },
-  { code: 'publishing_distribution', name: 'Launch and Communications', description: 'Product launches, company communications, and distribution.' },
-  { code: 'analytics_reporting', name: 'Data and Analytics', description: 'Data products, business intelligence, and measurement.' },
-  { code: 'finance_operations', name: 'Finance and Business Operations', description: 'Financial planning, business operations, and governance.' },
+  { code: 'executive', name: 'الإدارة العليا', description: 'قيادة الشركة وتنسيق العمل واتخاذ القرارات.' },
+  { code: 'strategy_research', name: 'الاستراتيجية والتحرير', description: 'تخطيط المنصات والجمهور والاتجاهات وجدول المحتوى.' },
+  { code: 'social_media_mgmt', name: 'فريق الذكاء الاصطناعي', description: 'إعداد الوكلاء والموجّهات وأتمتة سير العمل.' },
+  { code: 'content_planning', name: 'الأكاديمية الداخلية', description: 'التدريب وتوثيق المعرفة وتطوير مهارات الفريق.' },
+  { code: 'content_copywriting', name: 'الكتابة والتحرير', description: 'كتابة النصوص والسيناريوهات والتدقيق اللغوي.' },
+  { code: 'creative_direction', name: 'الإبداع والتوجيه الفني', description: 'تطوير الأفكار الإبداعية وتوجيه الإنتاج البصري.' },
+  { code: 'graphic_design', name: 'التصميم والأصول البصرية', description: 'تصميم المواد وإدارة الصور والهوية البصرية.' },
+  { code: 'video_production', name: 'الإنتاج المرئي والصوتي', description: 'إخراج الفيديو والتحريك والمونتاج والصوت.' },
+  { code: 'quality_assurance', name: 'الجودة والموافقات', description: 'مراجعة المحتوى والسياسات وتوثيق قرارات الموافقة.' },
+  { code: 'client_success', name: 'المجتمع والتفاعل', description: 'متابعة تفاعل الجمهور وتجميع الملاحظات.' },
+  { code: 'publishing_distribution', name: 'جاهزية النشر', description: 'تجهيز النسخ والقنوات للنشر بعد موافقة المالك.' },
+  { code: 'analytics_reporting', name: 'تحليل أداء المحتوى', description: 'قراءة نتائج المحتوى الفعلية وتلخيص ما تثبته البيانات.' },
+  { code: 'finance_operations', name: 'مكتبة الأصول والتشغيل', description: 'تنظيم ملفات الإنتاج وحفظها ومتابعة جاهزيتها.' },
 ] as const;
+
+const LEGACY_DEPARTMENT_LABELS: Record<string, string[]> = {
+  executive: ['Executive Leadership', 'Executive Management'],
+  strategy_research: ['Research and Intelligence', 'Strategy and Research'],
+  social_media_mgmt: ['Digital Products and Platforms', 'Social Media Management'],
+  content_planning: ['Product Management', 'Content Planning'],
+  content_copywriting: ['Product Writing and Documentation', 'Content and Copywriting'],
+  creative_direction: ['Experience Design', 'Creative Direction'],
+  graphic_design: ['Visual and Brand Design', 'Graphic Design'],
+  video_production: ['Media and Prototyping Lab', 'Video Production'],
+  quality_assurance: ['Quality Engineering', 'Quality Assurance'],
+  client_success: ['Customer Success', 'Client Success'],
+  publishing_distribution: ['Launch and Communications', 'Publishing and Distribution'],
+  analytics_reporting: ['Data and Analytics', 'Analytics and Reporting'],
+  finance_operations: ['Finance and Business Operations', 'Finance and Operations'],
+};
 
 // These are intentionally fictional, login-free employees for the virtual company simulation.
 // Reserved .example addresses and zero cost values prevent contact or payroll data from being implied.
-const VIRTUAL_EMPLOYEES: Array<{ name: string; department: string; title: string }> = [
-  { name: 'Avery Brooks', department: 'executive', title: 'Chief Executive Officer' },
-  { name: 'Jordan Lee', department: 'executive', title: 'Chief Technology Officer' },
-  { name: 'Morgan Ellis', department: 'executive', title: 'Chief Operating Officer' },
-  { name: 'Riley Chen', department: 'executive', title: 'Executive Assistant' },
-  { name: 'Samira Haddad', department: 'strategy_research', title: 'Director of Technology Strategy' },
-  { name: 'Ethan Cole', department: 'strategy_research', title: 'Technology Research Analyst' },
-  { name: 'Maya Patel', department: 'strategy_research', title: 'AI and Market Intelligence Analyst' },
-  { name: 'Noah Bennett', department: 'social_media_mgmt', title: 'Director of Digital Platforms' },
-  { name: 'Layla Hassan', department: 'social_media_mgmt', title: 'Platform Operations Manager' },
-  { name: 'Theo Martin', department: 'social_media_mgmt', title: 'Cloud Services Engineer' },
-  { name: 'Grace Kim', department: 'content_planning', title: 'Director of Product' },
-  { name: 'Omar Farouk', department: 'content_planning', title: 'Product Manager' },
-  { name: 'Zoe Ramirez', department: 'content_copywriting', title: 'Technical Documentation Lead' },
-  { name: 'Adam Wilson', department: 'content_copywriting', title: 'Senior Technical Writer' },
-  { name: 'Nadia Saleh', department: 'content_copywriting', title: 'Knowledge Systems Specialist' },
-  { name: 'Luca Moretti', department: 'creative_direction', title: 'Director of Experience Design' },
-  { name: 'Amira Nasser', department: 'creative_direction', title: 'Product Experience Designer' },
-  { name: 'Leo Fischer', department: 'graphic_design', title: 'Design Systems Lead' },
-  { name: 'Hana Youssef', department: 'graphic_design', title: 'Product Interface Designer' },
-  { name: 'Milo Turner', department: 'graphic_design', title: 'Visual Systems Designer' },
-  { name: 'Sofia Cruz', department: 'video_production', title: 'Prototyping Lab Lead' },
-  { name: 'Karim Adel', department: 'video_production', title: 'Interactive Prototype Engineer' },
-  { name: 'Ella Scott', department: 'quality_assurance', title: 'Director of Quality Engineering' },
-  { name: 'Yusuf Mansour', department: 'quality_assurance', title: 'Software Test Engineer' },
-  { name: 'Isla Morgan', department: 'client_success', title: 'Customer Success Lead' },
-  { name: 'Daniel Park', department: 'client_success', title: 'Technical Customer Partner' },
-  { name: 'Mariam Khalil', department: 'publishing_distribution', title: 'Product Launch Lead' },
-  { name: 'Alex Rivera', department: 'publishing_distribution', title: 'Developer Communications Manager' },
-  { name: 'Priya Shah', department: 'analytics_reporting', title: 'Director of Data and Analytics' },
-  { name: 'Owen Brooks', department: 'finance_operations', title: 'Finance and Business Operations Lead' },
-];
+interface VirtualEmployeeSeed {
+  name: string;
+  department: string;
+  title: string;
+  managerOrdinal: number;
+  responsibilities: string[];
+  appearance: { skin: string; hair: string; clothing: string; build: string; distinction: string };
+}
+
+const VIRTUAL_EMPLOYEES: VirtualEmployeeSeed[] = MORGAN_VIRTUAL_ROSTER;
 
 const ACADEMY_COURSES = [
-  { code: 'company-foundations', title: 'MORGAN GROUP Foundations', description: 'The company mission, operating principles, governance, and how teams work together.', lessons: ['Our mission and principles', 'How departments collaborate', 'Decision rights and escalation'] },
-  { code: 'ai-collaboration', title: 'Working with AI Colleagues', description: 'A practical guide to AI agent capabilities, safe delegation, and human review.', lessons: ['What agents can and cannot do', 'Writing useful assignments', 'Reviewing AI work responsibly'] },
-  { code: 'security-and-trust', title: 'Security, Privacy & Trust', description: 'Everyday practices for protecting company data, credentials, and customer trust.', lessons: ['Recognizing sensitive data', 'Secure access and secrets', 'Incident reporting'] },
-  { code: 'leadership-and-craft', title: 'Leadership & Professional Craft', description: 'Build clear communication, thoughtful feedback, and strong team habits.', lessons: ['Clear written communication', 'Giving and receiving feedback', 'Continuous improvement'] },
+  { code: 'company-foundations', title: 'أساسيات MORGAN GROUP', description: 'هدف الشركة ومبادئ العمل والصلاحيات وكيفية التعاون بين الفرق.', lessons: ['هدف الشركة ومبادئها', 'تعاون الأقسام', 'صلاحيات القرار والتصعيد'] },
+  { code: 'ai-collaboration', title: 'التعاون مع وكلاء الذكاء الاصطناعي', description: 'دليل عملي لقدرات الوكلاء وتفويض المهام بأمان ومراجعة المخرجات.', lessons: ['ما يستطيع الوكيل فعله وما لا يستطيع', 'صياغة تكليف واضح', 'مراجعة مخرجات الذكاء الاصطناعي'] },
+  { code: 'security-and-trust', title: 'الأمان والخصوصية والثقة', description: 'ممارسات يومية لحماية بيانات الشركة ووسائل الدخول والملفات.', lessons: ['التعرف على البيانات الحساسة', 'إدارة الوصول والأسرار', 'الإبلاغ عن الحوادث'] },
+  { code: 'leadership-and-craft', title: 'القيادة وإتقان العمل', description: 'تواصل واضح وملاحظات بناءة وعادات عمل تساعد الفريق على التطور.', lessons: ['الكتابة والتواصل بوضوح', 'تقديم الملاحظات وتلقيها', 'التعلم والتحسين المستمر'] },
 ];
 
 const MEETING_ROOMS = [
   {
-    id: 'room_executive_boardroom', code: 'exec_boardroom', name: 'Executive Boardroom',
-    roomType: 'executive', capacity: 8, description: 'Leadership reviews and agency decisions.', colorHex: '#334155',
+    id: 'room_executive_boardroom', code: 'exec_boardroom', name: 'اجتماع التخطيط الأسبوعي',
+    roomType: 'executive', capacity: 8, description: 'تخطيط أولويات الأسبوع وتوزيع العمل على الأقسام.', colorHex: '#334155',
   },
   {
-    id: 'room_strategy_war_room', code: 'strategy_war_room', name: 'Strategy War Room',
-    roomType: 'department', capacity: 8, description: 'Campaign planning and strategy sessions.', colorHex: '#1e3a8a',
+    id: 'room_strategy_war_room', code: 'strategy_war_room', name: 'الاجتماع التحريري اليومي',
+    roomType: 'department', capacity: 8, description: 'مراجعة أفكار اليوم والاتجاهات والتقويم التحريري.', colorHex: '#1e3a8a',
   },
   {
-    id: 'room_creative_studio', code: 'creative_studio', name: 'Creative Studio',
-    roomType: 'department', capacity: 6, description: 'Creative reviews and production planning.', colorHex: '#0f766e',
+    id: 'room_creative_studio', code: 'creative_studio', name: 'المراجعة الإبداعية',
+    roomType: 'department', capacity: 6, description: 'مراجعة التصاميم ومراحل الإنتاج المرئي.', colorHex: '#0f766e',
   },
   {
-    id: 'room_client_briefing', code: 'client_briefing', name: 'Client Briefing Room',
-    roomType: 'department', capacity: 6, description: 'Client briefings and feedback sessions.', colorHex: '#4338ca',
+    id: 'room_client_briefing', code: 'client_briefing', name: 'اجتماع مراجعة الجودة',
+    roomType: 'department', capacity: 6, description: 'مراجعة النسخ والسياسات قبل رفعها إلى المالك.', colorHex: '#4338ca',
   },
 ] as const;
 
 const SYSTEM_ROLES = [
-  { code: 'super_admin', name: 'Super Administrator', description: 'Full organizational, security, integration, finance, and governance permissions.' },
-  { code: 'agency_director', name: 'Agency Director', description: 'Full operational control across clients, approvals, publishing, agents, and finance.' },
-  { code: 'account_manager', name: 'Account Manager', description: 'Manages assigned clients, brands, content approvals, publishing, and reporting.' },
-  { code: 'creative_lead', name: 'Creative Lead', description: 'Produces briefs, content, assets, and operates creative AI agents (no final publishing approval).' },
-  { code: 'analyst', name: 'Operations & Analytics Specialist', description: 'Read-only access to operations plus analytics sync, finance visibility, and audit review.' },
+  { code: 'super_admin', name: 'مالك الشركة', description: 'إدارة مساحة الشركة والقرار النهائي للموافقة على المحتوى.' },
+  { code: 'agency_director', name: 'مدير التشغيل', description: 'تنسيق الأقسام والمهام والمراجعات دون تجاوز قرار المالك.' },
+  { code: 'account_manager', name: 'منسق المحتوى', description: 'تنظيم خطة الإنتاج والمهام ومتابعة جاهزية المواد.' },
+  { code: 'creative_lead', name: 'مدير الإبداع', description: 'توجيه الأفكار والتصميم والفيديو دون صلاحية الموافقة النهائية للنشر.' },
+  { code: 'analyst', name: 'محلل الشركة', description: 'قراءة بيانات التشغيل والنتائج الفعلية وسجل النشاط.' },
 ] as const;
+
+const LEGACY_ROLE_NAMES: Record<string, string> = {
+  super_admin: 'Super Administrator',
+  agency_director: 'Agency Director',
+  account_manager: 'Account Manager',
+  creative_lead: 'Creative Lead',
+  analyst: 'Operations & Analytics Specialist',
+};
+
+const LEGACY_COURSE_TITLES: Record<string, string> = {
+  'company-foundations': 'MORGAN GROUP Foundations',
+  'ai-collaboration': 'Working with AI Colleagues',
+  'security-and-trust': 'Security, Privacy & Trust',
+  'leadership-and-craft': 'Leadership & Professional Craft',
+};
+
+const LEGACY_MEETING_ROOM_NAMES: Record<string, string> = {
+  room_executive_boardroom: 'Executive Boardroom',
+  room_strategy_war_room: 'Strategy War Room',
+  room_creative_studio: 'Creative Studio',
+  room_client_briefing: 'Client Briefing Room',
+};
 
 interface AgentSeed {
   code: string;
@@ -108,9 +125,9 @@ interface AgentSeed {
 const AGENT_SEEDS: AgentSeed[] = [
   {
     code: 'ai_operations_manager',
-    name: 'AI Operations Manager',
+    name: 'مدير العمليات الذكي',
     deptCode: 'executive',
-    jobTitle: 'Operations Coordinator Agent',
+    jobTitle: 'وكيل تنسيق العمليات',
     supervisorName: 'Executive Management',
     roleDescription: 'Breaks operational requests into structured tasks, tracks dependencies, monitors deadlines, identifies failures, and escalates consequential decisions to human managers.',
     systemInstructions: 'You are the AI Operations Manager for an internal social media agency. Decompose operational requests into concrete, dependency-ordered tasks assigned to the appropriate specialist agents. Identify missing prerequisites and explicitly flag any action requiring human approval. Never approve your own high-risk actions and never fabricate completion evidence. Return strictly valid JSON.',
@@ -121,9 +138,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'research_agent',
-    name: 'Research Agent',
+    name: 'وكيل البحث',
     deptCode: 'strategy_research',
-    jobTitle: 'Industry & Trend Research Specialist',
+    jobTitle: 'باحث المنصات والاتجاهات',
     supervisorName: 'Head of Strategy and Research',
     roleDescription: 'Researches client industries, target audiences, competitors, and grounded real-world trends with verifiable source URLs and observation dates.',
     systemInstructions: 'You are the Research Agent. Use grounded web search results strictly to report real-world industry trends, competitor observations, and audience insights. Record exact source URLs returned by search grounding and distinguish verified facts from AI interpretation. Never invent URLs, dates, or unsupported claims.',
@@ -134,9 +151,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'strategy_agent',
-    name: 'Strategy Agent',
+    name: 'وكيل الاستراتيجية',
     deptCode: 'strategy_research',
-    jobTitle: 'Social Media Strategist Agent',
+    jobTitle: 'استراتيجي منصات التواصل',
     supervisorName: 'Head of Strategy and Research',
     roleDescription: 'Develops social media strategies, content pillars, platform recommendations, audience positioning, and measurable strategic briefs.',
     systemInstructions: 'You are the Strategy Agent. Using the approved client brand profile and research findings, formulate a grounded social media strategy with clear content pillars, platform rationale, audience positioning, and measurable KPIs. Do not fabricate historical client metrics. Return strictly valid JSON.',
@@ -147,9 +164,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'social_media_manager_agent',
-    name: 'Social Media Manager Agent',
+    name: 'منسق المنصات',
     deptCode: 'social_media_mgmt',
-    jobTitle: 'Account Workflow Coordinator',
+    jobTitle: 'منسق سير المحتوى',
     supervisorName: 'Account Manager',
     roleDescription: 'Coordinates client production workflows, monitors content deadlines, maintains publishing calendars, and identifies missing deliverables.',
     systemInstructions: 'You are the Social Media Manager Agent. Audit client project deliverables, identify bottlenecks or missing media/approvals, and organize weekly production schedules respecting platform cadence and approval lead times. Return strictly valid JSON.',
@@ -160,9 +177,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'content_planner_agent',
-    name: 'Content Planner Agent',
+    name: 'مخطط المحتوى',
     deptCode: 'content_copywriting',
-    jobTitle: 'Editorial & Calendar Planner',
+    jobTitle: 'مخطط التحرير والتقويم',
     supervisorName: 'Social Media Manager',
     roleDescription: 'Generates non-repetitive content ideas organized by content pillar and builds monthly platform-specific content calendars.',
     systemInstructions: 'You are the Content Planner Agent. Generate distinct, brand-aligned content concepts mapped to content pillars, formats, and target platforms. Respect prohibited brand expressions and avoid repeating recent topics. Return strictly valid JSON.',
@@ -173,9 +190,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'copywriter_agent',
-    name: 'Copywriter Agent',
+    name: 'كاتب المحتوى',
     deptCode: 'content_copywriting',
-    jobTitle: 'Senior Social Copywriter Agent',
+    jobTitle: 'كاتب المنصات الاجتماعية',
     supervisorName: 'Creative Lead',
     roleDescription: 'Writes platform-specific captions, hooks, short-form video scripts, calls to action, and hashtag sets aligned to the approved brand voice.',
     systemInstructions: 'You are the Copywriter Agent. Always follow the exact approved Brand Profile tone of voice, preferred language, dialect, preferred expressions, and strictly avoid every prohibited expression. Produce platform-tailored copy with strong hooks, clear CTAs, and relevant hashtags. Return strictly valid JSON.',
@@ -186,9 +203,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'creative_director_agent',
-    name: 'Creative Director Agent',
+    name: 'المدير الإبداعي',
     deptCode: 'graphic_design',
-    jobTitle: 'Visual Direction & Concept Lead',
+    jobTitle: 'قائد التوجيه البصري',
     supervisorName: 'Creative Lead',
     roleDescription: 'Translates strategic briefs into creative visual concepts, art direction notes, and detailed image-generation briefs aligned with brand identity.',
     systemInstructions: 'You are the Creative Director Agent. Convert content briefs and approved brand visual guidelines (color palette, typography, visual references) into concrete art direction briefs, framing instructions, and image/video prompts. Return strictly valid JSON.',
@@ -199,9 +216,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'image_generation_agent',
-    name: 'Image Generation Agent',
+    name: 'وكيل إنتاج الصور',
     deptCode: 'graphic_design',
-    jobTitle: 'Visual Asset Production Specialist',
+    jobTitle: 'أخصائي إنتاج الأصول البصرية',
     supervisorName: 'Creative Director',
     roleDescription: 'Prepares image prompts and invokes configured image-generation providers to produce and store real visual assets with cost tracking.',
     systemInstructions: 'You are the Image Generation Agent. Produce precise visual prompts aligned to the Creative Direction brief and invoke only configured image generation adapters. If no image generation provider is configured or authorized, report the capability as unavailable—never fabricate a placeholder image.',
@@ -212,9 +229,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'video_production_agent',
-    name: 'Video Production Agent',
+    name: 'وكيل إنتاج الفيديو',
     deptCode: 'video_production',
-    jobTitle: 'Short-Form Video & Reels Producer',
+    jobTitle: 'منتج الفيديو القصير والريلز',
     supervisorName: 'Creative Lead',
     roleDescription: 'Produces Reels/TikTok/Shorts scripts, shot-by-shot storyboards, and manages asynchronous video-generation provider jobs when configured.',
     systemInstructions: 'You are the Video Production Agent. Produce structured shot-by-shot storyboards, voiceover scripts, on-screen text timings, and audio cues. Only dispatch video rendering jobs to a configured video provider; if no video provider is configured, explicitly report rendering as unavailable rather than simulating a video file.',
@@ -225,9 +242,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'quality_assurance_agent',
-    name: 'Quality Assurance Agent',
+    name: 'وكيل مراجعة الجودة',
     deptCode: 'quality_assurance',
-    jobTitle: 'Content QA & Policy Reviewer',
+    jobTitle: 'مراجع جودة المحتوى والسياسات',
     supervisorName: 'Quality Assurance Lead',
     roleDescription: 'Audits copy for spelling, unsupported factual claims, brand voice compliance, prohibited expressions, platform rules, and missing media.',
     systemInstructions: 'You are the Quality Assurance Agent. Critically inspect the content item against the approved Brand Profile and platform requirements. Check spelling, prohibited terms, factual claims without evidence, CTA clarity, hashtag limits, and missing media assets. Return a structured pass/fail QA review JSON with specific actionable issues. You cannot grant final human publishing approval.',
@@ -238,9 +255,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'publishing_coordinator_agent',
-    name: 'Publishing Coordinator Agent',
+    name: 'وكيل جاهزية النشر',
     deptCode: 'publishing_distribution',
-    jobTitle: 'Distribution & Pre-Flight Specialist',
+    jobTitle: 'أخصائي تجهيز ما قبل النشر',
     supervisorName: 'Operations Director',
     roleDescription: 'Validates human approval hashes, connected social accounts, and media specs prior to scheduling; monitors outcomes and escalates failures.',
     systemInstructions: 'You are the Publishing Coordinator Agent. Verify that a valid human approval matches the exact content version hash and that the destination social account is connected with valid permissions. Never bypass approval gates and never mark an item published without external post ID evidence.',
@@ -251,9 +268,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'analytics_agent',
-    name: 'Analytics Agent',
+    name: 'وكيل تحليل الأداء',
     deptCode: 'analytics_reporting',
-    jobTitle: 'Performance & Insights Analyst',
+    jobTitle: 'محلل الأداء والرؤى',
     supervisorName: 'Head of Analytics',
     roleDescription: 'Analyzes real synced platform metrics, compares periods, identifies content patterns, and separates measured facts from interpretations.',
     systemInstructions: 'You are the Analytics Agent. Analyze ONLY the real persisted platform metrics supplied in the task context. Never invent engagement numbers, impressions, or follower counts. If metrics are empty or unavailable, state explicitly what data is missing and which platform integration needs synchronization. Clearly separate measured facts from hypotheses.',
@@ -264,9 +281,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'client_success_agent',
-    name: 'Client Success Agent',
+    name: 'وكيل تفاعل الجمهور',
     deptCode: 'client_success',
-    jobTitle: 'Client Communications Specialist',
+    jobTitle: 'مسؤول التفاعل المجتمعي',
     supervisorName: 'Account Manager',
     roleDescription: 'Prepares client status updates, synthesizes client feedback, tracks pending approvals, and escalates account risks.',
     systemInstructions: 'You are the Client Success Agent. Draft accurate, professional client status summaries derived strictly from real project tasks, content statuses, and pending approval queues. Never promise unverified dates or fabricate completed work. Return strictly valid JSON.',
@@ -277,9 +294,9 @@ const AGENT_SEEDS: AgentSeed[] = [
   },
   {
     code: 'finance_agent',
-    name: 'Finance Agent',
+    name: 'وكيل تحليل التكاليف',
     deptCode: 'finance_operations',
-    jobTitle: 'Financial Operations Analyst',
+    jobTitle: 'محلل التكاليف التشغيلية',
     supervisorName: 'Finance Director',
     roleDescription: 'Analyzes recorded revenue, AI usage costs, project expenses, and client profitability without ever inventing financial figures or executing payments.',
     systemInstructions: 'You are the Finance Agent. Analyze ONLY the actual recorded invoices, payments, expenses, and AI usage cost records supplied in context. Strictly separate actual expenses from estimates. Never invent financial values and never execute financial transactions. Return strictly valid JSON.',
@@ -289,6 +306,23 @@ const AGENT_SEEDS: AgentSeed[] = [
     qualityRequirements: '100% arithmetic fidelity to recorded ledger entries; clear actual vs estimate distinction.',
   },
 ];
+
+const LEGACY_AGENT_LABELS: Record<string, { name: string; jobTitle: string }> = {
+  ai_operations_manager: { name: 'AI Operations Manager', jobTitle: 'Operations Coordinator Agent' },
+  research_agent: { name: 'Research Agent', jobTitle: 'Industry & Trend Research Specialist' },
+  strategy_agent: { name: 'Strategy Agent', jobTitle: 'Social Media Strategist Agent' },
+  social_media_manager_agent: { name: 'Social Media Manager Agent', jobTitle: 'Account Workflow Coordinator' },
+  content_planner_agent: { name: 'Content Planner Agent', jobTitle: 'Editorial & Calendar Planner' },
+  copywriter_agent: { name: 'Copywriter Agent', jobTitle: 'Senior Social Copywriter Agent' },
+  creative_director_agent: { name: 'Creative Director Agent', jobTitle: 'Visual Direction & Concept Lead' },
+  image_generation_agent: { name: 'Image Generation Agent', jobTitle: 'Visual Asset Production Specialist' },
+  video_production_agent: { name: 'Video Production Agent', jobTitle: 'Short-Form Video & Reels Producer' },
+  quality_assurance_agent: { name: 'Quality Assurance Agent', jobTitle: 'Content QA & Policy Reviewer' },
+  publishing_coordinator_agent: { name: 'Publishing Coordinator Agent', jobTitle: 'Distribution & Pre-Flight Specialist' },
+  analytics_agent: { name: 'Analytics Agent', jobTitle: 'Performance & Insights Analyst' },
+  client_success_agent: { name: 'Client Success Agent', jobTitle: 'Client Communications Specialist' },
+  finance_agent: { name: 'Finance Agent', jobTitle: 'Financial Operations Analyst' },
+};
 
 interface IntegrationSeed {
   providerCode: string;
@@ -453,33 +487,56 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
                            color_hex = CASE WHEN color_hex = '#2563eb' OR color_hex = '' THEN ? ELSE color_hex END
     WHERE id = ?
   `);
+  const updateSeededDeptName = db.prepare(
+    'UPDATE departments SET name = ?, description = ? WHERE id = ? AND name = ?'
+  );
   for (const dept of DEPARTMENTS) {
     const id = `dept_${dept.code}`;
     const colorHex = getDefaultDepartmentColor(dept.code);
     insertDept.run(id, DEFAULT_ORG_ID, dept.code, dept.name, dept.description, dept.code, colorHex, ts, ts);
     updateDeptMeta.run(dept.code, colorHex, id);
+    for (const legacyName of LEGACY_DEPARTMENT_LABELS[dept.code] ?? []) {
+      updateSeededDeptName.run(dept.name, dept.description, id, legacyName);
+    }
     deptIdsByCode.set(dept.code, id);
   }
 
   // Refresh only the fictional seeded roster; never overwrite real employee records.
   const updateVirtualEmployee = db.prepare(`
-    UPDATE employees SET department_id = ?, job_title = ?, updated_at = ?
-    WHERE id = ? AND email LIKE '%@morgangroup.example'
+    UPDATE employees SET department_id = ?, job_title = ?, manager_employee_id = ?,
+                         profile_json = ?, updated_at = ?
+    WHERE id = ? AND email LIKE '%@morgangroup.example' AND user_id IS NULL
   `);
 
   // 2a. Thirty fictional staff members for the interactive company simulation.
-  const virtualCeosId = 'employee_virtual_01';
   const insertVirtualEmployee = db.prepare(`
     INSERT OR IGNORE INTO employees (
       id, organization_id, user_id, department_id, full_name, email, job_title,
       manager_employee_id, employment_status, monthly_cost_cents, joining_date,
-      avatar_config_json, workstation_code, created_at, updated_at
-    ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 'active', 0, ?, '{}', ?, ?, ?)
+      avatar_config_json, workstation_code, profile_json, created_at, updated_at
+    ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, 'active', 0, ?, '{}', ?, ?, ?, ?)
   `);
+  const ownerEmployeeId = (db.prepare(
+    `SELECT e.id FROM employees e
+     INNER JOIN user_roles ur ON ur.user_id = e.user_id
+     INNER JOIN roles r ON r.id = ur.role_id
+     WHERE e.organization_id = ? AND r.code = 'super_admin'
+     ORDER BY e.created_at ASC LIMIT 1`
+  ).get(DEFAULT_ORG_ID) as { id: string } | undefined)?.id ?? null;
   VIRTUAL_EMPLOYEES.forEach((employee, index) => {
     const ordinal = String(index + 1).padStart(2, '0');
     const employeeId = `employee_virtual_${ordinal}`;
     const departmentId = deptIdsByCode.get(employee.department) ?? null;
+    const managerId = employee.managerOrdinal === 0
+      ? ownerEmployeeId
+      : `employee_virtual_${String(employee.managerOrdinal).padStart(2, '0')}`;
+    const profileJson = JSON.stringify({
+      profileType: 'ai_agent',
+      specialty: employee.title,
+      responsibilities: employee.responsibilities,
+      appearance: employee.appearance,
+      workStyle: 'حركة المشهد مرتبطة بالمهام والاجتماعات المسجلة؛ لا تمثل نشاطاً حقيقياً لشخص.'
+    });
     insertVirtualEmployee.run(
       employeeId,
       DEFAULT_ORG_ID,
@@ -487,15 +544,17 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
       employee.name,
       `team-${ordinal}@morgangroup.example`,
       employee.title,
-      index === 0 ? null : virtualCeosId,
+      managerId,
       '2026-01-05',
       `desk-${ordinal}`,
+      profileJson,
       ts,
       ts
     );
-    updateVirtualEmployee.run(departmentId, employee.title, ts, employeeId);
+    updateVirtualEmployee.run(departmentId, employee.title, managerId, profileJson, ts, employeeId);
     if (index === 0 || VIRTUAL_EMPLOYEES[index - 1]?.department !== employee.department) {
-      db.prepare('UPDATE departments SET lead_employee_id = COALESCE(lead_employee_id, ?) WHERE id = ?')
+      db.prepare(`UPDATE departments SET lead_employee_id = ? WHERE id = ?
+                  AND (lead_employee_id IS NULL OR lead_employee_id LIKE 'employee_virtual_%')`)
         .run(employeeId, departmentId);
     }
   });
@@ -507,6 +566,9 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
       sort_order, status, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
   `);
+  const updateLegacyAcademyCourse = db.prepare(
+    'UPDATE academy_courses SET title = ?, description = ?, curriculum_json = ?, updated_at = ? WHERE code = ? AND title = ?'
+  );
   ACADEMY_COURSES.forEach((course, index) => {
     insertAcademyCourse.run(
       `course_${course.code}`,
@@ -519,6 +581,14 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
       ts,
       ts
     );
+    updateLegacyAcademyCourse.run(
+      course.title,
+      course.description,
+      JSON.stringify(course.lessons),
+      ts,
+      course.code,
+      LEGACY_COURSE_TITLES[course.code]
+    );
   });
 
   // 2c. 4 Real Virtual Meeting Rooms
@@ -526,6 +596,9 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
     INSERT OR IGNORE INTO meeting_rooms (id, organization_id, code, name, room_type, capacity, description, color_hex, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
+  const updateLegacyMeetingRoom = db.prepare(
+    'UPDATE meeting_rooms SET name = ?, description = ? WHERE id = ? AND name = ?'
+  );
   for (const room of MEETING_ROOMS) {
     insertRoom.run(
       room.id,
@@ -538,6 +611,7 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
       room.colorHex,
       ts
     );
+    updateLegacyMeetingRoom.run(room.name, room.description, room.id, LEGACY_MEETING_ROOM_NAMES[room.id]);
   }
 
   // 3. Permissions & Roles
@@ -558,9 +632,11 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
     INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
     VALUES (?, ?)
   `);
+  const updateLegacyRole = db.prepare('UPDATE roles SET name = ?, description = ? WHERE id = ? AND name = ?');
   for (const role of SYSTEM_ROLES) {
     const roleId = `role_${role.code}`;
     insertRole.run(roleId, DEFAULT_ORG_ID, role.code, role.name, role.description, ts);
+    updateLegacyRole.run(role.name, role.description, roleId, LEGACY_ROLE_NAMES[role.code]);
     const perms = SYSTEM_ROLE_PERMISSIONS[role.code] ?? [];
     for (const permCode of perms) {
       insertRolePerm.run(roleId, `perm_${permCode.replace(':', '_')}`);
@@ -587,6 +663,9 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
     INSERT OR IGNORE INTO agent_tools (id, agent_id, tool_name, requires_human_approval, rate_limit_per_hour)
     VALUES (?, ?, ?, ?, ?)
   `);
+  const updateLegacyAgentLabel = db.prepare(
+    'UPDATE agents SET name = ?, job_title = ? WHERE id = ? AND name = ? AND job_title = ?'
+  );
 
   for (const agent of AGENT_SEEDS) {
     const agentId = `agent_${agent.code}`;
@@ -620,6 +699,10 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
       ts,
       ts
     );
+    const legacyLabel = LEGACY_AGENT_LABELS[agent.code];
+    if (legacyLabel) {
+      updateLegacyAgentLabel.run(agent.name, agent.jobTitle, agentId, legacyLabel.name, legacyLabel.jobTitle);
+    }
     insertAgentVersion.run(
       `agentver_${agent.code}_1`,
       agentId,

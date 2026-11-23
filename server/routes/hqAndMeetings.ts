@@ -27,6 +27,17 @@ const avatarConfigSchema = z.object({
   accessory: z.enum(['none', 'headset', 'badge', 'tablet']).optional(),
 });
 
+function parseEmployeeProfile(raw: string | null | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const value = JSON.parse(raw);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return value as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 // ============================================================
 // 1. REAL-TIME SERVER-SENT EVENTS STREAM
 // ============================================================
@@ -128,7 +139,8 @@ hqAndMeetingsRouter.get('/hq/state', requireAuth, (req: AuthedRequest, res) => {
                FROM user_roles ur INNER JOIN roles r ON r.id = ur.role_id
                WHERE ur.user_id = e.user_id) as role_names,
               (SELECT COUNT(*) FROM tasks t WHERE t.assigned_user_id = e.user_id AND t.status NOT IN ('completed','cancelled')) as open_tasks,
-              (SELECT COUNT(*) FROM tasks t WHERE t.assigned_user_id = e.user_id AND t.status = 'running') as running_tasks
+              (SELECT COUNT(*) FROM tasks t WHERE t.assigned_user_id = e.user_id AND t.status = 'running') as running_tasks,
+              (SELECT COUNT(*) FROM tasks t WHERE t.assigned_user_id = e.user_id AND t.status = 'waiting_for_approval') as waiting_approval_tasks
        FROM employees e
        LEFT JOIN departments d ON d.id = e.department_id
        LEFT JOIN employees mgr ON mgr.id = e.manager_employee_id
@@ -171,6 +183,7 @@ hqAndMeetingsRouter.get('/hq/state', requireAuth, (req: AuthedRequest, res) => {
       employmentStatus: String(emp.employment_status || 'active'),
       activeMeetingId: meetingInfo?.meetingId ?? null,
       runningTaskCount: Number(emp.running_tasks || 0),
+      waitingApprovalTaskCount: Number(emp.waiting_approval_tasks || 0),
     });
     const avatarConfig = parseAvatarConfig(
       String(emp.avatar_config_json || ''),
@@ -184,13 +197,16 @@ hqAndMeetingsRouter.get('/hq/state', requireAuth, (req: AuthedRequest, res) => {
         slotIndexInDept: nextSlot((emp.department_id as string | null) ?? null),
         activeMeetingRoomId: meetingInfo?.roomId ?? null,
         meetingSeatIndex: meetingInfo?.seatIndex ?? 0,
+        operationalStatus,
       },
       zones
     );
 
+    const employeeProfile = parseEmployeeProfile(String(emp.profile_json || ''));
     return {
       ...emp,
-      actorType: 'human' as const,
+      actorType: employeeProfile.profileType === 'ai_agent' ? 'agent' as const : 'human' as const,
+      profile: employeeProfile,
       operationalStatus,
       avatarConfig,
       worldPosition,
@@ -725,6 +741,7 @@ hqAndMeetingsRouter.get('/employees/:id', requireAuth, (req: AuthedRequest, res)
   res.json({
     employee: {
       ...emp,
+      profile: parseEmployeeProfile(String(emp.profile_json || '')),
       avatarConfig: parseAvatarConfig(String(emp.avatar_config_json || ''), String(emp.id), false),
     },
     roles,

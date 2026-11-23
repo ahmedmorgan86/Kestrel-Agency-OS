@@ -24,12 +24,24 @@ export function EmployeeSummaryView({ employeeId, onBack }: { employeeId: string
     <PageHeader title={employee?.full_name || 'ملف عضو الفريق'} subtitle="تخصصات وقيادات الفريق الافتراضي لإنتاج المحتوى" actions={<button type="button" onClick={onBack} className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-700"><ArrowRight className="h-4 w-4" /> العودة</button>} />
     {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">{error}</div>}
     {employee && <div className="grid gap-5 lg:grid-cols-2">
-      <SectionCard title="بيانات الدور الوظيفي" description="هذه شخصية افتراضية مرتبطة بمهام إنتاج المحتوى.">
+      <SectionCard title="وكيل ذكاء اصطناعي" description="اسم مصري وهوية بصرية تمثيلية لدور ينفذه النموذج المحلي.">
         <div className="flex items-center gap-4"><span className="rounded-full bg-blue-50 p-4 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"><UserRound className="h-7 w-7" /></span><div><div className="text-lg font-semibold">{employee.full_name}</div><div className="text-sm text-slate-500">{employee.job_title}</div></div></div>
         <dl className="mt-5 space-y-3 text-sm"><div className="flex justify-between gap-4 border-t border-slate-200 pt-3 dark:border-slate-800"><dt className="text-slate-500">القسم</dt><dd>{employee.department_name || 'غير محدد'}</dd></div><div className="flex justify-between gap-4 border-t border-slate-200 pt-3 dark:border-slate-800"><dt className="text-slate-500">المدير المباشر</dt><dd>{employee.manager_name || 'إدارة الشركة'}</dd></div><div className="flex justify-between gap-4 border-t border-slate-200 pt-3 dark:border-slate-800"><dt className="text-slate-500">الحالة</dt><dd>{employee.activeMeetingId ? 'في اجتماع' : employee.operationalStatus === 'working' ? 'يعمل على مهمة' : 'متاح'}</dd></div></dl>
       </SectionCard>
       <SectionCard title="زملاء التخصص" description={`أعضاء فريق ${employee.department_name || 'الإنتاج'} `}>
         {coworkers.length ? <div className="divide-y divide-slate-200 dark:divide-slate-800">{coworkers.map((person) => <div key={person.id} className="flex justify-between gap-3 py-3 text-sm"><span className="font-medium">{person.full_name}</span><span className="text-left text-xs text-slate-500">{person.job_title}</span></div>)}</div> : <p className="text-sm text-slate-500">لا يوجد زملاء آخرون في هذا التخصص.</p>}
+      </SectionCard>
+      <SectionCard title="المسؤوليات ووصف المظهر" description="بيانات الدور الافتراضي للفريق. الوصف البصري لا يغيّر النماذج ثلاثية الأبعاد الحالية.">
+        <ul className="list-disc space-y-2 pr-5 text-sm text-slate-700 dark:text-slate-300">
+          {(employee.profile?.responsibilities || []).map((responsibility: string) => <li key={responsibility}>{responsibility}</li>)}
+        </ul>
+        {employee.profile?.appearance && <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm leading-7 text-slate-600 dark:bg-slate-950/50 dark:text-slate-300">
+          <div>البشرة: {employee.profile.appearance.skin}</div>
+          <div>الشعر: {employee.profile.appearance.hair}</div>
+          <div>الملابس: {employee.profile.appearance.clothing}</div>
+          <div>البنية: {employee.profile.appearance.build}</div>
+          <div>علامة مميزة: {employee.profile.appearance.distinction}</div>
+        </div>}
       </SectionCard>
     </div>}
   </div>;

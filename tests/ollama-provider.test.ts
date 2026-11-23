@@ -1,7 +1,56 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { generateStructuredText, verifyOllamaConnection } from '../server/services/aiProviders';
+import { generateStructuredText, getOllamaGenerationTimeoutSeconds, getOllamaKeepAlive, getOllamaNumThreads, verifyOllamaConnection } from '../server/services/aiProviders';
+
+test('local generation timeout defaults high enough for CPU inference and clamps unsafe values', () => {
+  const previous = process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS;
+  try {
+    delete process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS;
+    assert.equal(getOllamaGenerationTimeoutSeconds(), 900);
+    process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS = '30';
+    assert.equal(getOllamaGenerationTimeoutSeconds(), 60);
+    process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS = '3600';
+    assert.equal(getOllamaGenerationTimeoutSeconds(), 1800);
+    process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS = 'invalid';
+    assert.equal(getOllamaGenerationTimeoutSeconds(), 900);
+  } finally {
+    if (previous === undefined) delete process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS;
+    else process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS = previous;
+  }
+});
+
+test('local generation caps CPU threads without changing the model quality settings', () => {
+  const previous = process.env.OLLAMA_NUM_THREADS;
+  try {
+    delete process.env.OLLAMA_NUM_THREADS;
+    assert.equal(getOllamaNumThreads(), 4);
+    process.env.OLLAMA_NUM_THREADS = '12';
+    assert.equal(getOllamaNumThreads(), 8);
+    process.env.OLLAMA_NUM_THREADS = '0';
+    assert.equal(getOllamaNumThreads(), 1);
+    process.env.OLLAMA_NUM_THREADS = 'invalid';
+    assert.equal(getOllamaNumThreads(), 4);
+  } finally {
+    if (previous === undefined) delete process.env.OLLAMA_NUM_THREADS;
+    else process.env.OLLAMA_NUM_THREADS = previous;
+  }
+});
+
+test('local generation releases idle model memory after one minute by default', () => {
+  const previous = process.env.OLLAMA_KEEP_ALIVE;
+  try {
+    delete process.env.OLLAMA_KEEP_ALIVE;
+    assert.equal(getOllamaKeepAlive(), '60s');
+    process.env.OLLAMA_KEEP_ALIVE = '10m';
+    assert.equal(getOllamaKeepAlive(), '10m');
+    process.env.OLLAMA_KEEP_ALIVE = 'x'.repeat(33);
+    assert.equal(getOllamaKeepAlive(), '60s');
+  } finally {
+    if (previous === undefined) delete process.env.OLLAMA_KEEP_ALIVE;
+    else process.env.OLLAMA_KEEP_ALIVE = previous;
+  }
+});
 
 test('local Ollama adapter verifies the configured model and returns structured output without cloud usage', async () => {
   const captured: { chatBody: Record<string, unknown> | null } = { chatBody: null };
@@ -14,18 +63,23 @@ test('local Ollama adapter verifies the configured model and returns structured 
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(Buffer.from(chunk));
     captured.chatBody = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>;
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      message: { content: '{"summary":"Ready","requiresHumanApproval":true}' },
-      prompt_eval_count: 24,
-      eval_count: 12,
-    }));
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
+    const stream = [
+      { message: { content: '{"summary":"Ready",' }, done: false },
+      { message: { content: '"requiresHumanApproval":true}' }, done: false },
+      { done: true, prompt_eval_count: 24, eval_count: 12 },
+    ].map((event) => JSON.stringify(event)).join('\n') + '\n';
+    res.write(stream.slice(0, 19));
+    setTimeout(() => res.end(stream.slice(19)), 5);
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   assert.ok(address && typeof address === 'object');
   const previousBase = process.env.OLLAMA_BASE_URL;
   const previousModel = process.env.OLLAMA_MODEL;
+  const previousTimeout = process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS;
+  const previousThreads = process.env.OLLAMA_NUM_THREADS;
+  const previousKeepAlive = process.env.OLLAMA_KEEP_ALIVE;
   process.env.OLLAMA_BASE_URL = `http://127.0.0.1:${address.port}`;
   process.env.OLLAMA_MODEL = 'qwen3.5:4b';
 
@@ -46,13 +100,65 @@ test('local Ollama adapter verifies the configured model and returns structured 
     assert.equal(result.costUsd, 0);
     assert.equal(result.rateCardFound, true);
     assert.equal(captured.chatBody?.model, 'qwen3.5:4b');
-    assert.equal(captured.chatBody?.stream, false);
+    assert.equal(captured.chatBody?.stream, true);
     assert.equal(captured.chatBody?.think, false);
+    assert.equal((captured.chatBody?.options as Record<string, unknown>)?.num_predict, 700);
+    assert.equal((captured.chatBody?.options as Record<string, unknown>)?.num_thread, 4);
+    assert.equal(captured.chatBody?.keep_alive, '60s');
   } finally {
     if (previousBase === undefined) delete process.env.OLLAMA_BASE_URL;
     else process.env.OLLAMA_BASE_URL = previousBase;
     if (previousModel === undefined) delete process.env.OLLAMA_MODEL;
     else process.env.OLLAMA_MODEL = previousModel;
+    if (previousTimeout === undefined) delete process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS;
+    else process.env.OLLAMA_GENERATION_TIMEOUT_SECONDS = previousTimeout;
+    if (previousThreads === undefined) delete process.env.OLLAMA_NUM_THREADS;
+    else process.env.OLLAMA_NUM_THREADS = previousThreads;
+    if (previousKeepAlive === undefined) delete process.env.OLLAMA_KEEP_ALIVE;
+    else process.env.OLLAMA_KEEP_ALIVE = previousKeepAlive;
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
+});
+
+test('local Ollama adapter retries a transient connection reset once before failing a production stage', async (t) => {
+  let requests = 0;
+  const server = createServer(async (req, res) => {
+    if (req.url !== '/api/chat') return res.writeHead(404).end();
+    requests += 1;
+    for await (const _chunk of req) { /* consume request body */ }
+    res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
+    res.end(`${JSON.stringify({ message: { content: '{"ready":true}' }, done: false })}\n${JSON.stringify({ done: true })}\n`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const previousBase = process.env.OLLAMA_BASE_URL;
+  const previousModel = process.env.OLLAMA_MODEL;
+  const realFetch = globalThis.fetch;
+  process.env.OLLAMA_BASE_URL = `http://127.0.0.1:${address.port}`;
+  process.env.OLLAMA_MODEL = 'qwen3.5:4b';
+  let simulatedDisconnects = 0;
+  globalThis.fetch = async (input, init) => {
+    if (String(input).endsWith('/api/chat') && simulatedDisconnects === 0) {
+      simulatedDisconnects += 1;
+      throw new TypeError('fetch failed: ECONNRESET');
+    }
+    return realFetch(input, init);
+  };
+
+  t.after(async () => {
+    globalThis.fetch = realFetch;
+    if (previousBase === undefined) delete process.env.OLLAMA_BASE_URL;
+    else process.env.OLLAMA_BASE_URL = previousBase;
+    if (previousModel === undefined) delete process.env.OLLAMA_MODEL;
+    else process.env.OLLAMA_MODEL = previousModel;
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  });
+
+  const result = await generateStructuredText({
+    provider: 'ollama', model: 'qwen3.5:4b', systemInstruction: 'أخرج JSON.', prompt: 'أنشئ موجزاً.', expectJson: true,
+  });
+  assert.equal(result.parsedJson?.ready, true);
+  assert.equal(simulatedDisconnects, 1);
+  assert.equal(requests, 1);
 });

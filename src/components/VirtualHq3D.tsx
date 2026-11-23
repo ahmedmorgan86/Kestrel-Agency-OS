@@ -87,7 +87,7 @@ interface AnimatedHuman {
 const CAMERA_PRESETS: CameraPreset[] = [
   { id: 'atrium', label: 'البهو', pos: [0, 8, 7], target: [0, 1.35, 22] },
   { id: 'people', label: 'مساحة الفريق', pos: [0, 11, 31], target: [0, 1, 8] },
-  { id: 'overview', label: 'نظرة عامة', pos: [0, 18, 43], target: [0, 1.1, 2] },
+  { id: 'overview', label: 'نظرة عامة', pos: [0, 13, 32], target: [0, 1.1, 5] },
   { id: 'reception', label: 'الاستقبال', pos: [0, 7, 34], target: [0, 1.2, 19] },
   { id: 'executive', label: 'الإدارة', pos: [0, 8, 4], target: [0, 1.4, -15] },
   { id: 'creative', label: 'استوديو الإنتاج', pos: [-14, 8.5, 17], target: [-6, 1, 3] },
@@ -140,13 +140,15 @@ function makeSignTexture(
     ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
 
     ctx.fillStyle = darkSurface ? '#f8fafc' : '#0f172a';
-    ctx.font = '700 32px "Plus Jakarta Sans", system-ui, sans-serif';
+    ctx.font = '700 32px "Cairo", system-ui, sans-serif';
     ctx.textBaseline = 'middle';
-    ctx.fillText(title.slice(0, 26), 24, 68);
+    ctx.direction = 'rtl';
+    ctx.textAlign = 'right';
+    ctx.fillText(title.slice(0, 26), canvas.width - 24, 68);
 
     ctx.fillStyle = darkSurface ? '#94a3b8' : '#475569';
-    ctx.font = '500 20px "IBM Plex Mono", monospace';
-    ctx.fillText(subtitle.slice(0, 38), 24, 118);
+    ctx.font = '500 20px "Cairo", system-ui, sans-serif';
+    ctx.fillText(subtitle.slice(0, 38), canvas.width - 24, 118);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -687,8 +689,8 @@ export function VirtualHq3D({
     target: THREE.Vector3;
     active: boolean;
   }>({
-    pos: new THREE.Vector3(0, 18, 43),
-    target: new THREE.Vector3(0, 1.1, 2),
+    pos: new THREE.Vector3(0, 13, 32),
+    target: new THREE.Vector3(0, 1.1, 5),
     active: false,
   });
 
@@ -779,12 +781,12 @@ export function VirtualHq3D({
     scene.environment = envTarget.texture;
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.25, 220);
-    camera.position.set(0, 18, 43);
+    camera.position.set(0, 13, 32);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
-    controls.target.set(0, 1.1, 2);
+    controls.target.set(0, 1.1, 5);
     controls.minDistance = 8;
     controls.maxDistance = 68;
     controls.maxPolarAngle = Math.PI * 0.46;
@@ -947,22 +949,22 @@ export function VirtualHq3D({
     const wallScreens: Array<{ x: number; title: string; subtitle: string; color: string; route: string }> = [
       {
         x: -10,
-        title: 'APPROVAL CENTER',
-        subtitle: `${pendingApprovalsCount} pending human gate(s)`,
+        title: 'مركز الموافقات',
+        subtitle: `${pendingApprovalsCount} محتوى بانتظار مراجعتك`,
         color: pendingApprovalsCount > 0 ? '#d97706' : '#059669',
         route: 'approvals',
       },
       {
         x: 0,
         title: companyName.toUpperCase(),
-        subtitle: 'TECHNOLOGY · PRODUCTS · AI',
+        subtitle: 'تقنية · محتوى · إبداع',
         color: primaryColor,
         route: 'company',
       },
       {
         x: 10,
-        title: 'PRODUCT OPERATIONS',
-        subtitle: 'Teams · Systems · Delivery',
+        title: 'تشغيل المحتوى',
+        subtitle: 'الفرق · الأنظمة · الإنتاج',
         color: '#2563eb',
         route: 'content',
       },
@@ -1053,11 +1055,15 @@ export function VirtualHq3D({
       const signSub =
         zone.kind === 'meeting_room'
           ? activeRoom
-            ? `LIVE: ${activeRoom.title}`
-            : 'Room Available · Click to Enter'
+            ? `اجتماع جارٍ: ${activeRoom.title}`
+            : 'الغرفة متاحة · اختر لفتحها'
           : zone.kind === 'reception'
-          ? `${companyName} Directory`
-          : `${occupantCount} member${occupantCount === 1 ? '' : 's'} assigned`;
+          ? `${companyName} · استقبال الشركة`
+          : zone.kind === 'break_area'
+          ? 'مساحة راحة الفريق'
+          : zone.kind === 'approval_waiting'
+          ? `${occupantCount} ينتظرون المراجعة`
+          : `${occupantCount} عضو في القسم`;
 
       const signTex = makeSignTexture(zone.name, signSub, zone.colorHex, isDark, maxAnisotropy);
       disposableTextures.push(signTex);
@@ -1111,7 +1117,7 @@ export function VirtualHq3D({
         receptionToeKick.position.set(zone.x, 0.16, zone.z - 0.2);
         scene.add(receptionToeKick);
 
-        const welcomeTexture = makeSignTexture(companyName, 'TECHNOLOGY · PRODUCTS · AI', primaryColor, true, maxAnisotropy);
+        const welcomeTexture = makeSignTexture(companyName, 'تقنية · محتوى · إبداع', primaryColor, true, maxAnisotropy);
         disposableTextures.push(welcomeTexture);
         const welcomeFrame = new THREE.Mesh(
           new THREE.BoxGeometry(8.4, 2.45, 0.16),
@@ -1211,6 +1217,38 @@ export function VirtualHq3D({
         );
         statusStrip.position.set(zone.x, 0.82, zone.z - 0.25);
         scene.add(statusStrip);
+      } else if (zone.kind === 'break_area' || zone.kind === 'approval_waiting') {
+        const seatMaterial = new THREE.MeshStandardMaterial({
+          color: zone.kind === 'break_area' ? (isDark ? 0x27635f : 0x3d7d73) : (isDark ? 0x68512c : 0x9a7437),
+          roughness: 0.86,
+        });
+        const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x303b40, metalness: 0.45, roughness: 0.42 });
+        for (const seat of zone.workstations) {
+          const cushion = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.18, 0.82), seatMaterial);
+          cushion.position.set(seat.x, 0.54, seat.z);
+          cushion.rotation.y = seat.rotY;
+          cushion.castShadow = !isSoftwareGl;
+          scene.add(cushion);
+          const back = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.7, 0.14), seatMaterial);
+          back.position.set(seat.x, 0.93, seat.z + 0.32);
+          back.rotation.y = seat.rotY;
+          back.castShadow = !isSoftwareGl;
+          scene.add(back);
+          for (const legOffset of [-0.31, 0.31]) {
+            const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.08), frameMaterial);
+            leg.position.set(seat.x + legOffset, 0.25, seat.z + legOffset);
+            scene.add(leg);
+          }
+        }
+        if (zone.kind === 'break_area') {
+          const table = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.72, 0.72, 0.11, 24),
+            new THREE.MeshStandardMaterial({ color: isDark ? 0x37414a : 0x77654e, roughness: 0.42 })
+          );
+          table.position.set(zone.x, 0.65, zone.z);
+          table.receiveShadow = true;
+          scene.add(table);
+        }
       } else {
         // Department Workstations (show workstations for assigned slots, minimum 2 per department)
         const visibleStations = zone.workstations.slice(0, Math.max(2, Math.min(4, occupantCount || 2)));
@@ -1235,14 +1273,15 @@ export function VirtualHq3D({
     for (const actor of actors) {
       if (actor.actorType === 'human' && humanoidAssets.length > 0) {
         const asset = humanoidAssets[stableActorHash(actor.id) % humanoidAssets.length];
-        const isSeated = ['working', 'validating', 'in_meeting'].includes(actor.operationalStatus);
-        const offsetZ = actor.operationalStatus === 'in_meeting' ? 0 : actor.worldPosition.rotY === 0 ? 0.35 : -0.35;
+        const isSeated = ['working', 'validating', 'in_meeting', 'waiting_for_approval'].includes(actor.operationalStatus);
+        const atSeat = actor.operationalStatus === 'in_meeting' || actor.worldPosition.zoneId === 'zone_approval_waiting';
+        const offsetZ = atSeat ? 0 : actor.worldPosition.rotY === 0 ? 0.35 : -0.35;
         const targetPosition = new THREE.Vector3(
           actor.worldPosition.x,
           0,
           actor.worldPosition.z + offsetZ
         );
-        const targetRotationY = actor.worldPosition.rotY + (actor.operationalStatus === 'in_meeting' ? 0 : Math.PI);
+        const targetRotationY = actor.worldPosition.rotY + (atSeat ? 0 : Math.PI);
         const previous = actorPositionsRef.current.get(actor.id);
         const startPosition = previous?.position.clone() ?? targetPosition.clone();
         const startRotationY = previous?.rotationY ?? targetRotationY;

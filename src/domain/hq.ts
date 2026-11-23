@@ -22,7 +22,7 @@ export interface ZoneRect {
   id: string;
   code: string;
   name: string;
-  kind: 'reception' | 'executive' | 'department' | 'meeting_room';
+  kind: 'reception' | 'executive' | 'department' | 'meeting_room' | 'break_area' | 'approval_waiting';
   x: number;
   z: number;
   width: number;
@@ -62,6 +62,7 @@ export interface HumanOperationalInput {
   employmentStatus: string;
   activeMeetingId: string | null;
   runningTaskCount: number;
+  waitingApprovalTaskCount?: number;
 }
 
 export function deriveAgentOperationalState(input: AgentOperationalInput): OperationalStatus {
@@ -85,6 +86,7 @@ export function deriveHumanOperationalState(input: HumanOperationalInput): Opera
     return 'paused';
   }
   if (input.activeMeetingId) return 'in_meeting';
+  if ((input.waitingApprovalTaskCount ?? 0) > 0) return 'waiting_for_approval';
   if (input.runningTaskCount > 0) return 'working';
   return 'idle';
 }
@@ -291,6 +293,33 @@ export function computeHqFloorPlan(
     });
   });
 
+  zones.push(
+    {
+      id: 'zone_break_area',
+      code: 'break_area',
+      name: 'استراحة الفريق',
+      kind: 'break_area',
+      x: 24,
+      z: 21,
+      width: 11,
+      depth: 7,
+      colorHex: '#0f766e',
+      workstations: buildWorkstationsForZone('break_area', 24, 21, 11, 7, 4),
+    },
+    {
+      id: 'zone_approval_waiting',
+      code: 'approval_waiting',
+      name: 'منطقة انتظار المراجعة',
+      kind: 'approval_waiting',
+      x: -24,
+      z: 21,
+      width: 11,
+      depth: 7,
+      colorHex: '#d97706',
+      workstations: buildWorkstationsForZone('approval_waiting', -24, 21, 11, 7, 4),
+    }
+  );
+
   return zones;
 }
 
@@ -300,6 +329,7 @@ export interface ActorPlacementInput {
   slotIndexInDept: number;
   activeMeetingRoomId: string | null;
   meetingSeatIndex: number;
+  operationalStatus?: OperationalStatus;
 }
 
 export function computeActorWorldPosition(
@@ -316,6 +346,21 @@ export function computeActorWorldPosition(
         z: seat.z,
         rotY: seat.rotY,
         zoneId: room.id,
+        stationCode: seat.code,
+      };
+    }
+  }
+
+  if (actor.operationalStatus === 'waiting_for_approval') {
+    const approvalZone = zones.find((zone) => zone.kind === 'approval_waiting');
+    if (approvalZone?.workstations.length) {
+      const seat = approvalZone.workstations[actor.slotIndexInDept % approvalZone.workstations.length];
+      return {
+        x: seat.x,
+        y: 0,
+        z: seat.z,
+        rotY: seat.rotY,
+        zoneId: approvalZone.id,
         stationCode: seat.code,
       };
     }

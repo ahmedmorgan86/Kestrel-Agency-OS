@@ -458,6 +458,24 @@ export function VirtualHqView({
                       <span className="font-mono">{selectedHuman.worldPosition.stationCode}</span>
                     </div>
                   </div>
+                  {Array.isArray(selectedHuman.profile?.responsibilities) && (
+                    <div className="rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-950/50">
+                      <div className="font-semibold text-slate-800 dark:text-slate-100">مسؤوليات الدور</div>
+                      <ul className="mt-2 list-disc space-y-1 pr-4 text-slate-600 dark:text-slate-300">
+                        {selectedHuman.profile.responsibilities.map((responsibility: string) => (
+                          <li key={responsibility}>{responsibility}</li>
+                        ))}
+                      </ul>
+                      {selectedHuman.profile.appearance && (
+                        <p className="mt-2 leading-5 text-slate-500 dark:text-slate-400">
+                          وصف المظهر: {selectedHuman.profile.appearance.skin} · {selectedHuman.profile.appearance.hair} · {selectedHuman.profile.appearance.clothing} · {selectedHuman.profile.appearance.build}
+                        </p>
+                      )}
+                      <p className="mt-2 text-[11px] leading-5 text-amber-700 dark:text-amber-400">
+                        وصف المظهر محفوظ للملف، لكنه غير ممثل بعد في نماذج الشخصيات ثلاثية الأبعاد الحالية.
+                      </p>
+                    </div>
+                  )}
                   <div className="pt-2 flex flex-col gap-2">
                     <button
                       type="button"

@@ -10,6 +10,9 @@ Copy `.env.example` to `.env` (or configure secrets in your hosting platform):
 - `CREDENTIAL_ENCRYPTION_KEY` — Required in production; independent random secret with at least 32 characters for OAuth token encryption.
 - `OLLAMA_BASE_URL` — Local Ollama endpoint (defaults to `http://127.0.0.1:11434`).
 - `OLLAMA_MODEL` — Locally installed model (defaults to `qwen3.5:4b`).
+- `OLLAMA_NUM_THREADS` — CPU threads per local model request (defaults to 4, clamped from 1 to 8). This limits CPU contention; it does not change the model, context, or sampling quality settings.
+- `OLLAMA_KEEP_ALIVE` — How long Ollama keeps model weights in memory after a request (defaults to `60s`; pipeline stages stay warm, then idle memory is released).
+- `OLLAMA_GENERATION_TIMEOUT_SECONDS` — Per-specialist local model timeout; defaults to 900 seconds and is clamped between 60 and 1800 seconds for slower CPU inference.
 - Optional `GEMINI_API_KEY` — Google AI Studio cloud free tier; separate key, quotas, and provider terms apply.
 - Optional Social OAuth Apps: `META_APP_ID` / `META_APP_SECRET`, `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET`, `X_CLIENT_ID` / `X_CLIENT_SECRET`, `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET`, `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`.
 
@@ -44,6 +47,7 @@ For public deployment, use a persistent-volume host and TLS termination. Never d
 - The worker polls `background_jobs` every 2 seconds and claims due jobs with a lease (`lease_expires_at`).
 - **Crash Recovery**: If the process crashes mid-job, `reclaimStaleLeases` automatically re-queues expired leases on startup and every sweep cycle.
 - **Retries & Dead-Lettering**: Transient errors retry with exponential backoff (`computeExponentialBackoffMs`). Jobs exhausting `max_attempts` move to `dead_letter` and log a `system_events` entry.
+- **MORGAN GROUP local generation**: A dropped Ollama connection is retried up to two times per specialist stage. If a production run still fails, only the organization owner can start a linked replacement run from the production screen; the failed run and its error remain in the history. Other administrators cannot accept, re-run, or publish the owner's content.
 - **Timeout Reconciliation**: External social publishing calls that time out after 15 seconds are classified as `timeout_reconciliation_required` rather than blindly retried, preventing duplicate live posts.
 
 ## 4. Backup & Recovery Runbook

@@ -117,6 +117,9 @@ export function bootstrapSuperAdmin(input: {
      VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`
   ).run(userId, DEFAULT_ORG_ID, normalizedEmail, input.fullName.trim(), hashPassword(input.password), ts, ts);
 
+  db.prepare('UPDATE organizations SET owner_user_id = ? WHERE id = ? AND owner_user_id IS NULL')
+    .run(userId, DEFAULT_ORG_ID);
+
   db.prepare('INSERT INTO user_roles (user_id, role_id, assigned_at) VALUES (?, ?, ?)').run(
     userId,
     'role_super_admin',
