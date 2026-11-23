@@ -948,6 +948,44 @@ export const MIGRATIONS: Migration[] = [
       ALTER TABLE employees ADD COLUMN profile_json TEXT NOT NULL DEFAULT '{}';
     `,
   },
+  {
+    version: '008',
+    name: 'morgan_private_content_pipeline',
+    sql: `
+      CREATE TABLE IF NOT EXISTS morgan_production_runs (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        niche TEXT NOT NULL,
+        audience TEXT NOT NULL DEFAULT '',
+        platform TEXT NOT NULL,
+        format TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('queued','researching','producing','owner_review','accepted','changes_requested','failed')),
+        source_items_json TEXT NOT NULL DEFAULT '[]',
+        deliverable_json TEXT NOT NULL DEFAULT '{}',
+        task_ids_json TEXT NOT NULL DEFAULT '[]',
+        parent_run_id TEXT REFERENCES morgan_production_runs(id) ON DELETE SET NULL,
+        review_note TEXT NOT NULL DEFAULT '',
+        iteration INTEGER NOT NULL DEFAULT 1,
+        error_message TEXT NOT NULL DEFAULT '',
+        created_by_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_morgan_runs_status ON morgan_production_runs(status, updated_at DESC);
+      ALTER TABLE morgan_production_runs ADD COLUMN version_hash TEXT NOT NULL DEFAULT '';
+      CREATE TABLE IF NOT EXISTS morgan_production_decisions (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL REFERENCES morgan_production_runs(id) ON DELETE CASCADE,
+        version_hash TEXT NOT NULL,
+        decision TEXT NOT NULL CHECK (decision IN ('accepted','changes_requested')),
+        comments TEXT NOT NULL DEFAULT '',
+        decided_by_user_id TEXT NOT NULL REFERENCES users(id),
+        decided_at TEXT NOT NULL
+      );
+      ALTER TABLE tasks ADD COLUMN assigned_employee_id TEXT REFERENCES employees(id) ON DELETE SET NULL;
+    `,
+  },
 ];
 
 function ensureColumn(db: DatabaseSync, table: string, column: string, definition: string): void {

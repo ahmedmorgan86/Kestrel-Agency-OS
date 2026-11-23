@@ -8,6 +8,7 @@ import { executePlatformPublish, fetchPlatformAnalytics, type SocialPlatform } f
 import { createNotification, recordSystemEvent, writeAuditLog } from './audit';
 import { broadcastCompanyEvent } from './realtime';
 import { generateId, logStructured } from './security';
+import { processMorganProductionRun } from './morganProduction';
 
 const WORKER_ID = `worker_${process.pid}_${Math.random().toString(36).slice(2, 8)}`;
 let workerInterval: ReturnType<typeof setInterval> | null = null;
@@ -16,7 +17,7 @@ let lastHeartbeatAt: string | null = null;
 let jobsProcessedCount = 0;
 
 export interface EnqueueJobInput {
-  jobType: 'agent_task_execution' | 'publish_social_content' | 'analytics_sync' | 'trend_research';
+  jobType: 'agent_task_execution' | 'publish_social_content' | 'analytics_sync' | 'trend_research' | 'morgan_content_pipeline';
   payload: Record<string, unknown>;
   idempotencyKey?: string;
   correlationId?: string;
@@ -646,6 +647,9 @@ export async function processNextJobOnce(): Promise<boolean> {
         result = await handlePublishSocialJob(job.correlation_id, payload);
       } else if (job.job_type === 'analytics_sync') {
         result = await handleAnalyticsSyncJob(payload);
+      } else if (job.job_type === 'morgan_content_pipeline') {
+        await processMorganProductionRun(String(payload.runId || ''));
+        result = { runId: String(payload.runId || '') };
       } else {
         throw new Error(`Unknown background job type: ${job.job_type}`);
       }
@@ -665,6 +669,7 @@ export async function processNextJobOnce(): Promise<boolean> {
         errMsg.includes('Governance gate') ||
         errMsg.includes('paused') ||
         errMsg.includes('not authorized') ||
+        errMsg.includes('أوقفت المراجعة الداخلية') ||
         errMsg.includes('API_KEY_INVALID') ||
         errMsg.includes('PERMISSION_DENIED');
 

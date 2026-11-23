@@ -28,6 +28,7 @@ import {
   Palette,
   PenTool,
   Plus,
+  PlayCircle,
   Search,
   Send,
   Settings,
@@ -74,6 +75,7 @@ import { DepartmentWorkspaceView, VirtualHqView } from './views/VirtualHqView';
 import { MeetingsView } from './views/MeetingsView';
 import { AiAgentProfileView, MyWorkspaceView } from './views/ProfilesAndWorkspace';
 import { EmployeeSummaryView as HumanEmployeeProfileView } from './views/EmployeeSummaryView';
+import { MorganProductionView } from './views/MorganProductionView';
 
 interface NavGroup {
   label: string;
@@ -94,6 +96,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'إنتاج المحتوى',
     items: [
+      { id: 'production', label: 'تشغيل الإنتاج الآلي', icon: PlayCircle },
       { id: 'content', label: 'استوديو المحتوى', icon: PenTool },
       { id: 'calendar', label: 'تقويم المحتوى', icon: Calendar },
       { id: 'approvals', label: 'موافقتي قبل النشر', icon: FileCheck2 },
@@ -378,6 +381,8 @@ export default function App() {
         return <ResearchIntelligenceView mode="competitors" />;
       case 'content':
         return <ContentStudioView />;
+      case 'production':
+        return <MorganProductionView />;
       case 'calendar':
         return <ContentStudioView calendarOnly />;
       case 'approvals':
@@ -622,7 +627,7 @@ export default function App() {
                 <div className="absolute right-0 mt-1.5 w-52 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-1 z-50">
                   {[
                     { label: 'اجتماع جديد', route: 'meetings', icon: Video },
-                    { label: 'مسودة محتوى جديدة', route: 'content', icon: PenTool },
+                    { label: 'ابدأ إنتاج محتوى', route: 'production', icon: PenTool },
                   ].map((act) => {
                     const ActIcon = act.icon;
                     return (

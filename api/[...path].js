@@ -74,7 +74,12 @@ async function ensureSchema(p) {
     ALTER TABLE employees ADD COLUMN IF NOT EXISTS profile_json jsonb NOT NULL DEFAULT '{}'::jsonb;
     CREATE TABLE IF NOT EXISTS meeting_rooms(id text primary key,organization_id text not null references organizations(id),code text not null,name text not null,room_type text not null,capacity integer not null,description text not null default '',color_hex text not null,status text not null default 'active',unique(organization_id,code));
     CREATE TABLE IF NOT EXISTS meetings(id text primary key,organization_id text not null references organizations(id),room_id text references meeting_rooms(id),title text not null,status text not null default 'scheduled',started_at timestamptz,ended_at timestamptz,created_at timestamptz not null default now());
-    CREATE TABLE IF NOT EXISTS meeting_participants(id text primary key,meeting_id text not null references meetings(id) on delete cascade,participant_type text not null,participant_id text not null,seat_index integer not null default 0,unique(meeting_id,participant_type,participant_id));`);
+    CREATE TABLE IF NOT EXISTS meeting_participants(id text primary key,meeting_id text not null references meetings(id) on delete cascade,participant_type text not null,participant_id text not null,seat_index integer not null default 0,unique(meeting_id,participant_type,participant_id));
+    CREATE TABLE IF NOT EXISTS morgan_production_runs(id text primary key,organization_id text not null references organizations(id) on delete cascade,niche text not null,audience text not null default '',platform text not null,format text not null,status text not null check(status in ('queued','researching','producing','owner_review','accepted','changes_requested','failed')),source_items_json jsonb not null default '[]'::jsonb,deliverable_json jsonb not null default '{}'::jsonb,parent_run_id text references morgan_production_runs(id) on delete set null,review_note text not null default '',iteration integer not null default 1,error_message text not null default '',created_by_user_id text references users(id) on delete set null,created_at timestamptz not null default now(),updated_at timestamptz not null default now(),completed_at timestamptz);
+    CREATE INDEX IF NOT EXISTS idx_morgan_production_runs_owner ON morgan_production_runs(organization_id,created_at DESC);
+    CREATE TABLE IF NOT EXISTS morgan_production_tasks(id text primary key,run_id text not null references morgan_production_runs(id) on delete cascade,employee_id text not null references employees(id) on delete restrict,title text not null,status text not null check(status in ('queued','running','completed','failed')),result_json jsonb not null default '{}'::jsonb,updated_at timestamptz not null default now());
+    CREATE TABLE IF NOT EXISTS morgan_production_worker(id text primary key,model text not null,healthy boolean not null default false,detail text not null default '',last_seen_at timestamptz not null default now());
+    CREATE TABLE IF NOT EXISTS morgan_production_decisions(id text primary key,run_id text not null references morgan_production_runs(id) on delete cascade,version_hash text not null,decision text not null check(decision in ('accepted','changes_requested')),comments text not null default '',decided_by_user_id text not null references users(id),decided_at timestamptz not null default now());`);
     await p.query('INSERT INTO organizations(id,name) VALUES($1,$2) ON CONFLICT(id) DO NOTHING',[ORG,'MORGAN GROUP']);
     await p.query('UPDATE organizations SET owner_user_id=(SELECT id FROM users WHERE organization_id=$1 ORDER BY created_at ASC LIMIT 1) WHERE id=$1 AND owner_user_id IS NULL',[ORG]);
     for(const [code,name] of departments){
@@ -121,6 +126,20 @@ function cookies(req){return Object.fromEntries(String(req.headers.cookie||'').s
 async function signedIn(req,p){const token=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'')||cookies(req).kestrel_session;if(!token)return null;const r=await p.query('SELECT u.id,u.organization_id,u.email,u.full_name,u.status FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status=$2',[hashToken(token),'active']);return r.rows[0]||null;}
 function sendCookie(res,token){res.setHeader('Set-Cookie',`kestrel_session=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);}
 function respond(res,status,payload){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(payload));}
+const productionStaff=[['نورا خليل','قراءة إشارات المجال والمصادر'],['ياسر عبدالله','صياغة الاستراتيجية والجمهور'],['مازن حسن','كتابة النص والسيناريو'],['آدم زيدان','إعداد التصور البصري واللقطات'],['فادي منير','مراجعة اللغة والحقائق والسياسات']];
+async function createProductionRun(p,{niche,audience,platform,format,userId,parentRunId=null,iteration=1,reviewNote=''}){
+  const client=await p.connect();const runId=`mrun_${randomBytes(12).toString('hex')}`;
+  try{
+    await client.query('BEGIN');
+    await client.query('INSERT INTO morgan_production_runs(id,organization_id,niche,audience,platform,format,status,parent_run_id,review_note,iteration,created_by_user_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',[runId,ORG,niche,audience,platform,format,'queued',parentRunId,reviewNote,iteration,userId]);
+    for(const [fullName,title] of productionStaff){
+      const employee=(await client.query("SELECT id FROM employees WHERE organization_id=$1 AND full_name=$2 AND employment_status='active'",[ORG,fullName])).rows[0];
+      if(!employee)throw new Error(`موظف سير الإنتاج غير موجود: ${fullName}`);
+      await client.query("INSERT INTO morgan_production_tasks(id,run_id,employee_id,title,status) VALUES($1,$2,$3,$4,'queued')",[`mpt_${randomBytes(10).toString('hex')}`,runId,employee.id,title]);
+    }
+    await client.query('COMMIT');return runId;
+  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}
 export default async function handler(req,res){
   res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
   const path=new URL(req.url,'https://local.invalid').pathname.replace(/^\/api\/?/,'').replace(/\/$/,'');
@@ -134,6 +153,53 @@ export default async function handler(req,res){
     if(path==='auth/login'&&req.method==='POST'){const body=req.body||{};const email=String(body.email||'').trim().toLowerCase(),password=String(body.password||'');if(!email||!password)return respond(res,400,{error:'أدخل البريد وكلمة المرور.'});const ip=String(req.headers['x-forwarded-for']||'unknown').split(',')[0].trim();const ipHash=createHash('sha256').update(ip).digest('hex');const attempts=await p.query("SELECT count(*)::int AS count FROM login_attempts WHERE (email=$1 OR ip_hash=$2) AND created_at>now()-interval '15 minutes'",[email,ipHash]);if(attempts.rows[0].count>=10)return respond(res,429,{error:'محاولات كثيرة. انتظر 15 دقيقة ثم حاول مرة أخرى.'});const r=await p.query('SELECT * FROM users WHERE email=$1 AND status=$2',[email,'active']);if(!r.rows[0]||!verifyPassword(password,r.rows[0].password_hash)){await p.query('INSERT INTO login_attempts(email,ip_hash) VALUES($1,$2)',[email,ipHash]);return respond(res,401,{error:'البريد الإلكتروني أو كلمة المرور غير صحيحة.'});}await p.query('DELETE FROM login_attempts WHERE email=$1 OR ip_hash=$2',[email,ipHash]);const u=r.rows[0],token=issueToken();await p.query('INSERT INTO sessions(id,user_id,token_hash,expires_at) VALUES($1,$2,$3,now()+interval \'7 days\')',[`session_${randomBytes(12).toString('hex')}`,u.id,hashToken(token)]);sendCookie(res,token);return respond(res,200,{user:{id:u.id,organizationId:ORG,email:u.email,fullName:u.full_name,status:u.status,roles:['super_admin'],permissions:['*']},token});}
     if(path==='auth/logout'&&req.method==='POST'){const token=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'')||cookies(req).kestrel_session;if(token)await p.query('DELETE FROM sessions WHERE token_hash=$1',[hashToken(token)]);res.setHeader('Set-Cookie','kestrel_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0');return respond(res,200,{ok:true});}
     const user=await signedIn(req,p);if(!user)return respond(res,401,{error:'سجّل الدخول أولًا.'});
+    if(path==='morgan-production/readiness'&&req.method==='GET'){
+      const worker=(await p.query('SELECT model,healthy,detail,last_seen_at FROM morgan_production_worker WHERE id=$1',[ORG])).rows[0];
+      const ready=Boolean(worker?.healthy&&Date.now()-new Date(worker.last_seen_at).getTime()<45000);
+      return respond(res,200,{ready,model:worker?.model||null,detail:ready?'عامل الإنتاج المحلي متصل.':'عامل الإنتاج المجاني على جهازك غير متصل. شغّل خادم الشركة محلياً بعد ضبط DATABASE_URL وOllama.',scope:'neon-queue'});
+    }
+    if(path==='morgan-production'&&req.method==='GET'){
+      const r=await p.query('SELECT * FROM morgan_production_runs WHERE organization_id=$1 ORDER BY created_at DESC LIMIT 40',[ORG]);
+      return respond(res,200,{runs:r.rows.map(x=>({...x,sources:x.source_items_json,deliverable:x.deliverable_json}))});
+    }
+    if(path==='morgan-production'&&req.method==='POST'){
+      const body=req.body||{},niche=String(body.niche||'').trim(),audience=String(body.audience||'').trim().slice(0,300),platform=String(body.platform||''),format=String(body.format||'');
+      if(niche.length<3||niche.length>180||!['instagram','tiktok','youtube','facebook','linkedin'].includes(platform)||!['reel','short_video','carousel','post','thread'].includes(format))return respond(res,400,{error:'أدخل مجالاً صالحاً واختر المنصة وشكل المحتوى.'});
+      const heartbeat=(await p.query('SELECT healthy,last_seen_at FROM morgan_production_worker WHERE id=$1',[ORG])).rows[0];
+      if(!heartbeat?.healthy||Date.now()-new Date(heartbeat.last_seen_at).getTime()>45000)return respond(res,503,{error:'عامل الإنتاج المحلي غير متصل؛ لم نبدأ طلباً ولن ننشئ محتوى وهمياً.'});
+      const runId=await createProductionRun(p,{niche,audience,platform,format,userId:user.id});
+      return respond(res,202,{runId,status:'queued',assignedEmployeeCount:productionStaff.length});
+    }
+    if(path.match(/^morgan-production\/[^/]+$/)&&req.method==='GET'){
+      const id=decodeURIComponent(path.split('/')[1]);
+      const run=(await p.query('SELECT * FROM morgan_production_runs WHERE id=$1 AND organization_id=$2',[id,ORG])).rows[0];
+      if(!run)return respond(res,404,{error:'طلب الإنتاج غير موجود.'});
+      const [tasks,decisions]=await Promise.all([p.query('SELECT t.id,t.title,t.status,t.updated_at,e.full_name employee_name FROM morgan_production_tasks t JOIN employees e ON e.id=t.employee_id WHERE t.run_id=$1 ORDER BY t.id',[id]),p.query('SELECT d.version_hash,d.decision,d.comments,d.decided_at,u.full_name reviewer_name FROM morgan_production_decisions d JOIN users u ON u.id=d.decided_by_user_id WHERE d.run_id=$1 ORDER BY d.decided_at DESC',[id])]);
+      return respond(res,200,{run:{...run,sources:run.source_items_json,deliverable:run.deliverable_json,tasks:tasks.rows,decisions:decisions.rows}});
+    }
+    const productionDecision=path.match(/^morgan-production\/([^/]+)\/decision$/);
+    if(productionDecision&&req.method==='POST'){
+      const owner=(await p.query('SELECT owner_user_id FROM organizations WHERE id=$1',[ORG])).rows[0]?.owner_user_id;
+      if(!owner||user.id!==owner)return respond(res,403,{error:'قرار المحتوى محجوز لصاحب الشركة فقط.'});
+      const id=decodeURIComponent(productionDecision[1]),decision=String(req.body?.decision||''),comments=String(req.body?.comments||'').trim().slice(0,2000);
+      if(!['accepted','changes_requested'].includes(decision))return respond(res,400,{error:'اختر قبول النسخة أو طلب إعادة إنتاجها.'});
+      if(decision==='changes_requested'&&comments.length<2)return respond(res,400,{error:'اكتب ملاحظات إعادة الإنتاج.'});
+      const client=await p.connect();let run;
+      try{
+        await client.query('BEGIN');
+        run=(await client.query('SELECT * FROM morgan_production_runs WHERE id=$1 AND organization_id=$2 FOR UPDATE',[id,ORG])).rows[0];
+        const internalQaRejected=run?.status==='failed'&&Boolean(run.deliverable_json?.content?.title)&&run.deliverable_json?.qualityReview?.readyForOwner===false;
+        if(!run||!(run.status==='owner_review'||internalQaRejected)){await client.query('ROLLBACK');return respond(res,409,{error:'لا يمكن اتخاذ قرار قبل اكتمال الإنتاج والمراجعة الداخلية.'});}
+        if(internalQaRejected&&decision!=='changes_requested'){await client.query('ROLLBACK');return respond(res,409,{error:'أوقفت الجودة الداخلية هذه النسخة؛ يمكنك طلب إعادة إنتاجها فقط.'});}
+        const versionHash=createHash('sha256').update(JSON.stringify(run.deliverable_json)).digest('hex');
+        await client.query('INSERT INTO morgan_production_decisions(id,run_id,version_hash,decision,comments,decided_by_user_id) VALUES($1,$2,$3,$4,$5,$6)',[`mpd_${randomBytes(12).toString('hex')}`,id,versionHash,decision,comments,user.id]);
+        await client.query('UPDATE morgan_production_runs SET status=$1,review_note=$2,updated_at=now() WHERE id=$3',[decision,comments,id]);
+        await client.query('COMMIT');
+      }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+      if(decision==='accepted')return respond(res,200,{decision:'accepted',published:false});
+      const nextRunId=await createProductionRun(p,{niche:run.niche,audience:run.audience,platform:run.platform,format:run.format,userId:user.id,parentRunId:run.id,iteration:Number(run.iteration)+1,reviewNote:comments});
+      return respond(res,200,{decision:'changes_requested',nextRunId});
+    }
     if(path==='organization'&&req.method==='GET'){const r=await p.query('SELECT * FROM organizations WHERE id=$1',[ORG]);return respond(res,200,{organization:r.rows[0]});}
     if(path==='dashboard'&&req.method==='GET'){
       const [clients,projects,employees,depts]=await Promise.all([

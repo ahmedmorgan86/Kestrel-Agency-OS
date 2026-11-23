@@ -1,4 +1,6 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+dotenv.config();
 import path from 'node:path';
 import express from 'express';
 import cookieParser from 'cookie-parser';
@@ -19,6 +21,7 @@ import { distributionAndFinanceRouter } from './server/routes/distributionAndFin
 import { hqAndMeetingsRouter } from './server/routes/hqAndMeetings';
 import { academyRouter } from './server/routes/academy';
 import { assertProductionSecrets, getSecurityReadiness } from './server/services/security';
+import { startNeonMorganWorker, stopNeonMorganWorker } from './server/services/neonMorganWorker';
 
 function validateProductionConfiguration(): void {
   if (process.env.NODE_ENV !== 'production') return;
@@ -114,13 +117,15 @@ if (isMain) {
   createAppServer()
     .then((app) => {
       startWorkerLoop();
+      const neonWorkerStarted = startNeonMorganWorker();
+      if (neonWorkerStarted) logStructured('info', 'morgan_neon_worker_started', { model: process.env.OLLAMA_MODEL || 'qwen3.5:4b' });
       const server = app.listen(port, '0.0.0.0', () => {
         logStructured('info', 'server_listening', { port, env: process.env.NODE_ENV || 'development' });
       });
 
       const shutdown = () => {
         stopWorkerLoop();
-        server.close(() => process.exit(0));
+        void stopNeonMorganWorker().finally(() => server.close(() => process.exit(0)));
       };
       process.on('SIGTERM', shutdown);
       process.on('SIGINT', shutdown);
