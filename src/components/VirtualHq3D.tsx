@@ -140,14 +140,14 @@ function makeSignTexture(
     ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
 
     ctx.fillStyle = darkSurface ? '#f8fafc' : '#0f172a';
-    ctx.font = '700 32px "IBM Plex Sans Arabic", system-ui, sans-serif';
+    ctx.font = '700 32px "Cairo", system-ui, sans-serif';
     ctx.textBaseline = 'middle';
     ctx.direction = 'rtl';
     ctx.textAlign = 'right';
     ctx.fillText(title.slice(0, 26), canvas.width - 24, 68);
 
     ctx.fillStyle = darkSurface ? '#94a3b8' : '#475569';
-    ctx.font = '500 20px "IBM Plex Sans Arabic", system-ui, sans-serif';
+    ctx.font = '500 20px "Cairo", system-ui, sans-serif';
     ctx.fillText(subtitle.slice(0, 38), canvas.width - 24, 118);
   }
   const tex = new THREE.CanvasTexture(canvas);
