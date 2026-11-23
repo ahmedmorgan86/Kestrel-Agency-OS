@@ -1028,7 +1028,7 @@ export function VirtualHqView({
                     <div className="min-w-0"><h3 className="text-lg font-bold text-slate-900 dark:text-white">{d.name}</h3>
                     <p className="mt-1 text-xs leading-6 text-slate-500 dark:text-slate-400">{d.description || 'فريق متخصص ضمن منظومة إنتاج المحتوى.'}</p></div>
                   </div>
-                  <StatusText status={d.status || 'active'} />
+                  <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300">{d.status === 'inactive' || d.status === 'paused' ? 'متوقف' : d.status === 'archived' ? 'مؤرشف' : 'نشط'}</span>
                 </div>
               </div>
               <div className="space-y-4 p-5">
