@@ -1007,59 +1007,46 @@ export function VirtualHqView({
 
       {/* TAB 4: DEPARTMENT DIRECTORY */}
       {tab === 'directory' && hq && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="space-y-5">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-6 text-white shadow-xl sm:p-8">
+            <div className="pointer-events-none absolute -left-12 -top-24 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+            <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <div><div className="text-xs font-semibold tracking-[.22em] text-cyan-300">MORGAN GROUP · AI STUDIO</div><h2 className="mt-3 text-2xl font-bold sm:text-3xl">فريق الإنتاج الذكي</h2><p className="mt-2 max-w-2xl text-sm leading-7 text-slate-300">وكلاء ذكاء اصطناعي بأسماء وتخصصات واضحة. كل مهمة تمر بالمراجعة النهائية لصاحب الشركة قبل النشر.</p></div>
+              <div className="flex gap-3">{[{label:'الأقسام',value:hq.departments.length},{label:'وكلاء نشطون',value:hq.agents.filter((a)=>a.operationalStatus==='working').length},{label:'بانتظار موافقتك',value:counts?.pendingApprovals??0}].map((item)=><div key={item.label} className="min-w-24 rounded-xl border border-white/10 bg-white/5 px-4 py-3"><div className="text-xl font-bold tabular-nums">{item.value}</div><div className="mt-1 text-[11px] text-slate-400">{item.label}</div></div>)}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {hq.departments.map((d) => (
             <div
               key={d.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 flex flex-col justify-between gap-4 hover:border-blue-500 transition-colors"
+              className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-500/50 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900"
             >
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-sm shrink-0"
-                      style={{ backgroundColor: d.color_hex || '#2563eb' }}
-                    />
-                    <h3 className="font-semibold text-base text-slate-900 dark:text-slate-100">{d.name}</h3>
+              <div className="border-b border-slate-100 p-5 dark:border-slate-800">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="mt-1 h-10 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: d.color_hex || '#0891b2' }} />
+                    <div className="min-w-0"><h3 className="text-lg font-bold text-slate-900 dark:text-white">{d.name}</h3>
+                    <p className="mt-1 text-xs leading-6 text-slate-500 dark:text-slate-400">{d.description || 'فريق متخصص ضمن منظومة إنتاج المحتوى.'}</p></div>
                   </div>
                   <StatusText status={d.status || 'active'} />
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{d.description}</p>
               </div>
-
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
-                  <div>
-                    <div className="text-slate-500 dark:text-slate-400">Humans</div>
-                    <div className="font-mono font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{d.employee_count}</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-500 dark:text-slate-400">AI Agents</div>
-                    <div className="font-mono font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{d.agent_count}</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-500 dark:text-slate-400">Tasks (Open/Done)</div>
-                    <div className="font-mono font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
-                      {d.active_tasks}/{d.completed_tasks}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                    Lead: {d.manager_name || 'Unassigned'}
-                  </span>
+              <div className="space-y-4 p-5">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500 dark:text-slate-400"><span><b className="text-slate-900 dark:text-slate-100">{d.agent_count || 0}</b> وكيل ذكاء اصطناعي</span><span><b className="text-slate-900 dark:text-slate-100">{d.active_tasks || 0}</b> مهام مفتوحة</span><span><b className="text-slate-900 dark:text-slate-100">{d.completed_tasks || 0}</b> مكتملة</span></div>
+                <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <span className="truncate text-xs text-slate-500 dark:text-slate-400">قيادة التخصص: {d.manager_name || 'قائد الفريق الافتراضي'}</span>
                   <button
                     type="button"
                     onClick={() => onOpenDepartment(d.id)}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline shrink-0"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-800 transition group-hover:bg-cyan-50 group-hover:text-cyan-800 dark:bg-slate-800 dark:text-slate-200 dark:group-hover:bg-cyan-950 dark:group-hover:text-cyan-200"
                   >
-                    Workspace <ExternalLink className="w-3 h-3" />
+                    فتح مساحة القسم <ExternalLink className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
 

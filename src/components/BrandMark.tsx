@@ -129,11 +129,14 @@ export function ActorAvatar({
   if (actorType === 'agent') {
     return (
       <div
-        className={`${dims} rounded-lg flex items-center justify-center text-white font-semibold shrink-0 border border-white/15`}
-        style={{ backgroundColor: accent }}
-        title={`${name} (AI Employee)`}
+        className={`${dims} relative flex shrink-0 items-center justify-center rounded-full border border-white/70 font-bold text-white shadow-sm ring-1 ring-slate-200/80 dark:border-slate-800 dark:ring-slate-700`}
+        style={{ background: `linear-gradient(145deg, ${accent}, color-mix(in srgb, ${accent} 66%, #0f172a))` }}
+        title={`${name} · وكيل ذكاء اصطناعي`}
       >
-        <Bot className={size === 'sm' ? 'w-3.5 h-3.5' : size === 'lg' ? 'w-7 h-7' : 'w-4 h-4'} aria-hidden="true" />
+        <span>{initials || 'AI'}</span>
+        <span className={`absolute -bottom-0.5 -left-0.5 flex items-center justify-center rounded-full border-2 border-white bg-cyan-500 text-white dark:border-slate-900 ${size === 'sm' ? 'h-3 w-3' : 'h-4 w-4'}`} aria-label="وكيل ذكاء اصطناعي">
+          <Bot className={size === 'sm' ? 'h-1.5 w-1.5' : 'h-2 w-2'} aria-hidden="true" />
+        </span>
       </div>
     );
   }
