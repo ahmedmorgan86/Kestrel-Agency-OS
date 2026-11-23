@@ -998,6 +998,15 @@ export const MIGRATIONS: Migration[] = [
       WHERE owner_user_id IS NULL;
     `,
   },
+  {
+    version: '010',
+    name: 'morgan_ai_only_virtual_workforce',
+    sql: `
+      UPDATE employees
+      SET profile_json = json_set(profile_json, '$.profileType', 'ai_agent')
+      WHERE id LIKE 'employee_virtual_%';
+    `,
+  },
 ];
 
 function ensureColumn(db: DatabaseSync, table: string, column: string, definition: string): void {

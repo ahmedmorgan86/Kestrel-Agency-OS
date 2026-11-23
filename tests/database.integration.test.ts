@@ -59,6 +59,7 @@ test('database migrations, honest system config seed, auth bootstrap, credential
     'آية كمال', 'زياد عادل', 'ملك ناصر', 'فادي منير', 'هدى بكر', 'أنس الشاذلي', 'روان عثمان', 'كنان رفعت', 'جود حمدي', 'سيف البدري',
   ]);
   assert.ok(roster.every((employee) => employee.user_id === null && employee.email.endsWith('@morgangroup.example')));
+  assert.ok(roster.every((employee) => JSON.parse(employee.profile_json).profileType === 'ai_agent'), 'All 30 virtual profiles are AI agents, while owner authentication remains human-only');
   const hairDescriptions = new Set<string>();
   assert.ok(roster.every((employee) => {
     const profile = JSON.parse(employee.profile_json) as { responsibilities?: unknown[]; appearance?: Record<string, unknown> };

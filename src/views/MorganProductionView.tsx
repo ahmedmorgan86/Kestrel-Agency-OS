@@ -80,7 +80,7 @@ export function MorganProductionView() {
     try {
       const result = await apiRequest<{ runId: string; assignedEmployeeCount: number }>('/morgan-production', { method: 'POST', body: form });
       setActiveRunId(result.runId);
-      setNotice(`بدأ التشغيل وأُسندت ${result.assignedEmployeeCount} مهام إلى موظفي الشركة الافتراضيين المتخصصين.`);
+      setNotice(`بدأ التشغيل وأُسندت ${result.assignedEmployeeCount} مهام إلى وكلاء الذكاء الاصطناعي المتخصصين.`);
       setReviewNote('');
       await loadRuns();
     } catch (err) {

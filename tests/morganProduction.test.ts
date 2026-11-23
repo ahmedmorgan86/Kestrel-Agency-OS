@@ -54,7 +54,7 @@ test('deduplicates repeated headlines and caps fetched signals at ten', () => {
   assert.equal(sources.filter((source) => source.title === 'عنوان مكرر').length, 1);
 });
 
-test('production assigns five specialists and binds owner decisions to the exact saved version', async (t) => {
+test('production assigns a task-sized AI team and binds owner decisions to the exact saved version', async (t) => {
   const oldDb = process.env.SQLITE_DB_PATH;
   const oldSecret = process.env.SESSION_SECRET;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'morgan-production-'));
@@ -90,6 +90,7 @@ test('production assigns five specialists and binds owner decisions to the exact
   assert.equal(bootstrap.status, 201);
   const { token, user } = await bootstrap.json() as { token: string; user: { id: string } };
   assert.equal((db.prepare('SELECT owner_user_id FROM organizations WHERE id=?').get('org_kestrel_agency') as { owner_user_id: string }).owner_user_id, user.id);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM employees WHERE id LIKE 'employee_virtual_%' AND json_extract(profile_json,'$.profileType')='ai_agent'").get() as { count: number }).count, 30);
 
   const secondUserId = 'usr_morgan_test_non_owner';
   const ts = new Date().toISOString();
@@ -104,10 +105,11 @@ test('production assigns five specialists and binds owner decisions to the exact
   });
   assert.equal(started.status, 202);
   const { runId, assignedEmployeeCount } = await started.json() as { runId: string; assignedEmployeeCount: number };
-  assert.equal(assignedEmployeeCount, 5);
+  assert.equal(assignedEmployeeCount, 7);
   const assignments = db.prepare('SELECT t.assigned_employee_id,e.full_name FROM tasks t JOIN employees e ON e.id=t.assigned_employee_id WHERE json_extract(t.inputs_json, \'$.productionRunId\')=? ORDER BY e.full_name').all(runId) as Array<{ assigned_employee_id: string; full_name: string }>;
-  assert.equal(assignments.length, 5);
+  assert.equal(assignments.length, 7);
   assert.ok(assignments.every((assignment) => assignment.assigned_employee_id.startsWith('employee_virtual_')));
+  assert.deepEqual(new Set(assignments.map((assignment) => assignment.full_name)), new Set(['نورا خليل', 'ياسر عبدالله', 'مازن حسن', 'آدم زيدان', 'فادي منير', 'هشام رأفت', 'لمى سعيد']));
 
   const deliverable = { content: { title: 'نسخة مراجعة', caption: 'نص للاختبار' }, qualityReview: { readyForOwner: true } };
   const serialized = JSON.stringify(deliverable);
@@ -150,7 +152,7 @@ test('production assigns five specialists and binds owner decisions to the exact
   assert.equal(nextRun.iteration, 2);
   assert.equal(nextRun.status, 'queued');
   assert.equal(nextRun.review_note, 'اجعل المقدمة أقصر وأوضح.');
-  assert.equal((db.prepare('SELECT count(*) count FROM tasks WHERE json_extract(inputs_json, \'$.productionRunId\')=?').get(nextRunId) as { count: number }).count, 5);
+  assert.equal((db.prepare('SELECT count(*) count FROM tasks WHERE json_extract(inputs_json, \'$.productionRunId\')=?').get(nextRunId) as { count: number }).count, 7);
 
   const qaStart = await fetch(`${api}/morgan-production`, {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
@@ -195,10 +197,10 @@ test('production assigns five specialists and binds owner decisions to the exact
   });
   assert.equal(ownerRetry.status, 202);
   const retryBody = await ownerRetry.json() as { runId: string; assignedEmployeeCount: number };
-  assert.equal(retryBody.assignedEmployeeCount, 5);
+  assert.equal(retryBody.assignedEmployeeCount, 7);
   const retryRun = db.prepare('SELECT parent_run_id,iteration,status FROM morgan_production_runs WHERE id=?').get(retryBody.runId) as { parent_run_id: string; iteration: number; status: string };
   assert.equal(retryRun.parent_run_id, failedRun.runId);
   assert.equal(retryRun.iteration, 2);
   assert.equal(retryRun.status, 'queued');
-  assert.equal((db.prepare('SELECT count(*) count FROM tasks WHERE json_extract(inputs_json, \'$.productionRunId\')=?').get(retryBody.runId) as { count: number }).count, 5);
+  assert.equal((db.prepare('SELECT count(*) count FROM tasks WHERE json_extract(inputs_json, \'$.productionRunId\')=?').get(retryBody.runId) as { count: number }).count, 7);
 });

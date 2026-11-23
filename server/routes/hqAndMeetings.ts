@@ -202,10 +202,11 @@ hqAndMeetingsRouter.get('/hq/state', requireAuth, (req: AuthedRequest, res) => {
       zones
     );
 
+    const employeeProfile = parseEmployeeProfile(String(emp.profile_json || ''));
     return {
       ...emp,
-      actorType: 'human' as const,
-      profile: parseEmployeeProfile(String(emp.profile_json || '')),
+      actorType: employeeProfile.profileType === 'ai_agent' ? 'agent' as const : 'human' as const,
+      profile: employeeProfile,
       operationalStatus,
       avatarConfig,
       worldPosition,

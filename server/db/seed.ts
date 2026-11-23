@@ -531,7 +531,7 @@ export function seedSystemConfiguration(db: DatabaseSync): void {
       ? ownerEmployeeId
       : `employee_virtual_${String(employee.managerOrdinal).padStart(2, '0')}`;
     const profileJson = JSON.stringify({
-      profileType: 'fictional_virtual_staff',
+      profileType: 'ai_agent',
       specialty: employee.title,
       responsibilities: employee.responsibilities,
       appearance: employee.appearance,

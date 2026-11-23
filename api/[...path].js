@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { attachDatabasePool } from '@vercel/functions';
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 import { MORGAN_VIRTUAL_ROSTER } from '../shared/virtualRoster.js';
+import { selectMorganProductionTeam } from '../shared/morganProductionTeam.js';
 
 // Keep the serverless handler self-contained: Vercel's Node runtime does not
 // load TypeScript source imports at request time.
@@ -88,21 +89,23 @@ async function ensureSchema(p) {
     }
     const legacyLeadOrdinalByDepartment={executive:1,strategy_research:5,social_media_mgmt:8,content_planning:11,content_copywriting:13,creative_direction:16,graphic_design:18,video_production:21,quality_assurance:23,client_success:25,publishing_distribution:27,analytics_reporting:29,finance_operations:30};
     const ownerUserId=(await p.query('SELECT owner_user_id FROM organizations WHERE id=$1',[ORG])).rows[0]?.owner_user_id||null;
+    await p.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS actor_type text NOT NULL DEFAULT 'human'");
     for(let i=0;i<roster.length;i++){
       const employee=roster[i],legacy=legacyRoster[i],ordinal=i+1,employeeId=`employee_virtual_${String(ordinal).padStart(2,'0')}`;
       const newManagerId=employee.managerOrdinal?`employee_virtual_${String(employee.managerOrdinal).padStart(2,'0')}`:null;
       const legacyLead=legacyLeadOrdinalByDepartment[legacy[1]],legacyManagerOrdinal=ordinal===1?null:ordinal===legacyLead?1:legacyLead;
       const legacyManagerId=legacyManagerOrdinal?`employee_virtual_${String(legacyManagerOrdinal).padStart(2,'0')}`:null;
       const employeeEmail=`employee${ordinal}@morgan-group.example`;
-      const profile={specialty:employee.title,responsibilities:employee.responsibilities,appearance:employee.appearance};
+      const profile={profileType:'ai_agent',specialty:employee.title,responsibilities:employee.responsibilities,appearance:employee.appearance,workStyle:'وكيل ذكاء اصطناعي؛ الاسم والهيئة تمثيل بصري داخل الشركة.'};
       const profileJson=JSON.stringify(profile);
-      await p.query('INSERT INTO employees(id,organization_id,department_id,full_name,job_title,email,manager_employee_id,manager_user_id,profile_json) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) ON CONFLICT(id) DO NOTHING',[employeeId,ORG,`dept_${employee.department}`,employee.name,employee.title,employeeEmail,newManagerId,ordinal===1?ownerUserId:null,profileJson]);
+      await p.query("INSERT INTO employees(id,organization_id,department_id,full_name,job_title,email,manager_employee_id,manager_user_id,profile_json,actor_type) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,'agent') ON CONFLICT(id) DO NOTHING",[employeeId,ORG,`dept_${employee.department}`,employee.name,employee.title,employeeEmail,newManagerId,ordinal===1?ownerUserId:null,profileJson]);
       await p.query(`UPDATE employees SET
         department_id=CASE WHEN department_id=ANY($10::text[]) OR department_id=$3 THEN $3 ELSE department_id END,
         full_name=$4,job_title=$5,
         manager_employee_id=$7,
         manager_user_id=CASE WHEN $11::boolean AND (manager_user_id IS NULL OR manager_user_id=$8) THEN $8 ELSE manager_user_id END,
-        profile_json=CASE WHEN profile_json='{}'::jsonb OR profile_json=$9::jsonb THEN $9::jsonb ELSE profile_json END
+        profile_json=CASE WHEN profile_json='{}'::jsonb OR profile_json=$9::jsonb THEN $9::jsonb ELSE jsonb_set(profile_json,'{profileType}','\"ai_agent\"'::jsonb,true) END,
+        actor_type='agent'
         WHERE id=$1 AND organization_id=$2 AND email=$6
           AND ((full_name=$12 AND job_title=$13) OR (full_name=$4 AND job_title=$5))
           AND (manager_employee_id IS NULL OR manager_employee_id=$14 OR manager_employee_id=$7)`,[
@@ -126,15 +129,16 @@ function cookies(req){return Object.fromEntries(String(req.headers.cookie||'').s
 async function signedIn(req,p){const token=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'')||cookies(req).kestrel_session;if(!token)return null;const r=await p.query('SELECT u.id,u.organization_id,u.email,u.full_name,u.status FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status=$2',[hashToken(token),'active']);return r.rows[0]||null;}
 function sendCookie(res,token){res.setHeader('Set-Cookie',`kestrel_session=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`);}
 function respond(res,status,payload){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(payload));}
-const productionStaff=[['نورا خليل','قراءة إشارات المجال والمصادر'],['ياسر عبدالله','صياغة الاستراتيجية والجمهور'],['مازن حسن','كتابة النص والسيناريو'],['آدم زيدان','إعداد التصور البصري واللقطات'],['فادي منير','مراجعة اللغة والحقائق والسياسات']];
 async function createProductionRun(p,{niche,audience,platform,format,userId,parentRunId=null,iteration=1,reviewNote=''}){
   const client=await p.connect();const runId=`mrun_${randomBytes(12).toString('hex')}`;
   try{
     await client.query('BEGIN');
     await client.query('INSERT INTO morgan_production_runs(id,organization_id,niche,audience,platform,format,status,parent_run_id,review_note,iteration,created_by_user_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',[runId,ORG,niche,audience,platform,format,'queued',parentRunId,reviewNote,iteration,userId]);
-    for(const [fullName,title] of productionStaff){
-      const employee=(await client.query("SELECT id FROM employees WHERE organization_id=$1 AND full_name=$2 AND employment_status='active'",[ORG,fullName])).rows[0];
+    const productionStaff=selectMorganProductionTeam({niche,platform,format});
+    for(const {name:fullName,title} of productionStaff){
+      const employee=(await client.query("SELECT id,actor_type FROM employees WHERE organization_id=$1 AND full_name=$2 AND employment_status='active'",[ORG,fullName])).rows[0];
       if(!employee)throw new Error(`موظف سير الإنتاج غير موجود: ${fullName}`);
+      if(employee.actor_type!=='agent')throw new Error(`لا يمكن إسناد الإنتاج إلى حساب بشري: ${fullName}`);
       await client.query("INSERT INTO morgan_production_tasks(id,run_id,employee_id,title,status) VALUES($1,$2,$3,$4,'queued')",[`mpt_${randomBytes(10).toString('hex')}`,runId,employee.id,title]);
     }
     await client.query('COMMIT');return runId;
@@ -178,7 +182,7 @@ export default async function handler(req,res){
       const heartbeat=(await p.query('SELECT healthy,last_seen_at FROM morgan_production_worker WHERE id=$1',[ORG])).rows[0];
       if(!heartbeat?.healthy||Date.now()-new Date(heartbeat.last_seen_at).getTime()>45000)return respond(res,503,{error:'عامل الإنتاج المحلي غير متصل؛ لم نبدأ طلباً ولن ننشئ محتوى وهمياً.'});
       const runId=await createProductionRun(p,{niche,audience,platform,format,userId:user.id});
-      return respond(res,202,{runId,status:'queued',assignedEmployeeCount:productionStaff.length});
+      return respond(res,202,{runId,status:'queued',assignedEmployeeCount:selectMorganProductionTeam({niche,platform,format}).length});
     }
     if(path.match(/^morgan-production\/[^/]+$/)&&req.method==='GET'){
       const id=decodeURIComponent(path.split('/')[1]);
@@ -199,7 +203,7 @@ export default async function handler(req,res){
       const heartbeat=(await p.query('SELECT healthy,last_seen_at FROM morgan_production_worker WHERE id=$1',[ORG])).rows[0];
       if(!heartbeat?.healthy||Date.now()-new Date(heartbeat.last_seen_at).getTime()>45000)return respond(res,503,{error:'عامل الإنتاج المحلي غير متصل. لم يبدأ طلب جديد.'});
       const nextRunId=await createProductionRun(p,{niche:run.niche,audience:run.audience,platform:run.platform,format:run.format,userId:user.id,parentRunId:run.id,iteration:Number(run.iteration)+1});
-      return respond(res,202,{runId:nextRunId,status:'queued',assignedEmployeeCount:productionStaff.length});
+      return respond(res,202,{runId:nextRunId,status:'queued',assignedEmployeeCount:selectMorganProductionTeam(run).length});
     }
     const productionDecision=path.match(/^morgan-production\/([^/]+)\/decision$/);
     if(productionDecision&&req.method==='POST'){

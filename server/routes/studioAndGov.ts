@@ -26,16 +26,9 @@ import {
 import { dispatchRealVideoGeneration, generateRealImage } from '../services/aiProviders';
 import { cancelBackgroundJob, enqueueBackgroundJob } from '../services/worker';
 import { getMorganProductionReadiness } from '../services/morganProduction';
+import { selectMorganProductionTeam } from '../../shared/morganProductionTeam.js';
 
 export const studioAndGovRouter = Router();
-
-const MORGAN_PRODUCTION_STAFF = [
-  { name: 'نورا خليل', title: 'تحليل الاتجاهات وتوثيق المصادر' },
-  { name: 'ياسر عبدالله', title: 'استراتيجية الجمهور والمنصة' },
-  { name: 'مازن حسن', title: 'كتابة النص والسيناريو' },
-  { name: 'آدم زيدان', title: 'الاتجاه البصري وقائمة اللقطات' },
-  { name: 'فادي منير', title: 'مراجعة اللغة والادعاءات ومخاطر المنصة' },
-];
 
 function createMorganRun(input: {
   niche: string; audience: string; platform: string; format: string; userId: string;
@@ -45,15 +38,17 @@ function createMorganRun(input: {
   const id = generateId('mrun');
   const ts = nowIso();
   const taskIds: string[] = [];
+  const productionTeam = selectMorganProductionTeam(input);
   db.prepare(`INSERT INTO morgan_production_runs
     (id, organization_id, niche, audience, platform, format, status, parent_run_id, review_note, iteration, created_by_user_id, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)`)
     .run(id, DEFAULT_ORG_ID, input.niche, input.audience, input.platform, input.format,
       input.parentRunId ?? null, input.reviewNote ?? '', input.iteration ?? 1, input.userId, ts, ts);
-  for (const member of MORGAN_PRODUCTION_STAFF) {
+  for (const member of productionTeam) {
     const employee = db.prepare('SELECT id, department_id FROM employees WHERE full_name = ? AND employment_status = \'active\'')
       .get(member.name) as { id: string; department_id: string | null } | undefined;
     if (!employee) throw new Error(`موظف سير الإنتاج غير موجود: ${member.name}`);
+    if (!employee.id.startsWith('employee_virtual_')) throw new Error(`لا يمكن إسناد الإنتاج إلى حساب بشري: ${member.name}`);
     const taskId = generateId('task');
     db.prepare(`INSERT INTO tasks (id, organization_id, title, description, task_type, department_id, assigned_employee_id, priority, status, inputs_json, created_by_user_id, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 'content_production', ?, ?, 'high', 'queued', ?, ?, ?, ?)`)
@@ -642,7 +637,7 @@ studioAndGovRouter.post('/morgan-production', requirePermission('content:write')
       actorLabel: req.authUser!.email, action: 'morgan.production.started', entityType: 'morgan_production_run',
       entityId: runId, metadata: { niche: parsed.data.niche, platform: parsed.data.platform, format: parsed.data.format },
     });
-    res.status(202).json({ runId, status: 'queued', assignedEmployeeCount: MORGAN_PRODUCTION_STAFF.length });
+    res.status(202).json({ runId, status: 'queued', assignedEmployeeCount: selectMorganProductionTeam(parsed.data).length });
   } catch (error) {
     res.status(503).json({ error: error instanceof Error ? error.message : 'تعذر بدء الإنتاج.' });
   }
@@ -692,7 +687,7 @@ studioAndGovRouter.post('/morgan-production/:id/retry', requirePermission('appro
     actorLabel: req.authUser!.email, action: 'morgan.production.retried', entityType: 'morgan_production_run',
     entityId: nextRunId, metadata: { previousRunId: run.id, previousError: run.error_message },
   });
-  return res.status(202).json({ runId: nextRunId, status: 'queued', assignedEmployeeCount: MORGAN_PRODUCTION_STAFF.length });
+  return res.status(202).json({ runId: nextRunId, status: 'queued', assignedEmployeeCount: selectMorganProductionTeam({ niche: String(run.niche), platform: String(run.platform), format: String(run.format) }).length });
 });
 
 studioAndGovRouter.post('/morgan-production/:id/decision', requirePermission('approvals:decide'), (req: AuthedRequest, res) => {

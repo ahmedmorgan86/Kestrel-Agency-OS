@@ -16,8 +16,10 @@ test('Neon production completes separate specialist stages and hands each result
   const strategy = { contentAngle: 'زاوية تعليمية', audienceInsight: 'طلاب يبحثون عن أمثلة عملية' };
   const content = { title: 'عنوان عربي', caption: 'نص عربي واضح', hashtags: ['#تعليم'], factsToVerify: ['رقم يحتاج مراجعة'] };
   const creative = { visualDirection: 'تصوير شاشة مع شرح', storyboard: [{ number: 1, description: 'عرض المثال' }], onScreenText: ['ابدأ بالتجربة'], assetChecklist: ['لقطة شاشة'] };
+  const edit = { editPlan: 'مونتاج بإيقاع واضح' };
+  const audio = { voiceoverDirection: 'صوت واضح وترجمة متزامنة' };
   const qa = { readyForOwner: true, languageIssues: [], unsupportedClaims: [], policyRisks: [], recommendations: [] };
-  const outputs = [strategy, content, creative, qa];
+  const outputs = [strategy, content, creative, edit, audio, qa];
   const trace: string[] = [];
   const prompts: string[] = [];
 
@@ -44,13 +46,15 @@ test('Neon production completes separate specialist stages and hands each result
     'start:ياسر عبدالله', 'generate:1', 'save:ياسر عبدالله',
     'start:مازن حسن', 'generate:2', 'save:مازن حسن',
     'start:آدم زيدان', 'generate:3', 'save:آدم زيدان',
-    'start:فادي منير', 'generate:4', 'save:فادي منير',
+    'start:هشام رأفت', 'generate:4', 'save:هشام رأفت',
+    'start:لمى سعيد', 'generate:5', 'save:لمى سعيد',
+    'start:فادي منير', 'generate:6', 'save:فادي منير',
   ]);
   assert.match(prompts[0], /التعليم الرقمي/);
   assert.match(prompts[1], /زاوية تعليمية/);
   assert.match(prompts[1], /اختصر المقدمة/);
   assert.match(prompts[2], /نص عربي واضح/);
-  assert.match(prompts[3], /لقطة شاشة/);
+  assert.match(prompts[5], /لقطة شاشة/);
   assert.equal((pack.content as Record<string, unknown>).title, 'عنوان عربي');
   assert.deepEqual(pack.content.hashtags, ['#تعليم']);
   assert.equal(pack.qualityReview.readyForOwner, true);
@@ -84,6 +88,8 @@ test('Neon production retries malformed truncated local JSON once with a shorter
     { contentAngle: 'زاوية تعليمية', audienceInsight: 'طلاب الجامعات' },
     { title: 'عنوان عربي', caption: 'شرح واضح', hashtags: [], factsToVerify: [] },
     { visualDirection: 'تصوير توضيحي', storyboard: [], onScreenText: [], assetChecklist: [] },
+    { editPlan: 'قطع سريع' },
+    { voiceoverDirection: 'واضح' },
     { readyForOwner: true, languageIssues: [], unsupportedClaims: [], policyRisks: [], recommendations: [] },
   ];
   const pack = await buildMorganProductionPack(
@@ -99,7 +105,14 @@ test('Neon production retries malformed truncated local JSON once with a shorter
       },
     },
   );
-  assert.equal(generation, 5);
+  assert.equal(generation, 7);
   assert.match(prompts[1], /موجزة جداً وصالحة/);
   assert.equal(pack.qualityReview.readyForOwner, true);
+});
+
+test('production team size follows format, risk, and platform scope', async () => {
+  const { selectMorganProductionTeam } = await import('../shared/morganProductionTeam.js');
+  assert.equal(selectMorganProductionTeam({ niche: 'تعليم', platform: 'instagram', format: 'post' }).length, 5);
+  assert.equal(selectMorganProductionTeam({ niche: 'تعليم', platform: 'instagram', format: 'reel' }).length, 7);
+  assert.equal(selectMorganProductionTeam({ niche: 'صحة وطب', platform: 'multi', format: 'carousel' }).length, 8);
 });
