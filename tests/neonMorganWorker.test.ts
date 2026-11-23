@@ -76,3 +76,30 @@ test('Neon production stops before creative work when the writer returns an inco
   assert.deepEqual(started, ['ياسر عبدالله', 'مازن حسن']);
   assert.equal(generation, 2);
 });
+
+test('Neon production retries malformed truncated local JSON once with a shorter prompt', async () => {
+  const prompts: string[] = [];
+  let generation = 0;
+  const outputs = [
+    { contentAngle: 'زاوية تعليمية', audienceInsight: 'طلاب الجامعات' },
+    { title: 'عنوان عربي', caption: 'شرح واضح', hashtags: [], factsToVerify: [] },
+    { visualDirection: 'تصوير توضيحي', storyboard: [], onScreenText: [], assetChecklist: [] },
+    { readyForOwner: true, languageIssues: [], unsupportedClaims: [], policyRisks: [], recommendations: [] },
+  ];
+  const pack = await buildMorganProductionPack(
+    { niche: 'التعليم الرقمي', platform: 'instagram', format: 'reel' }, [source],
+    {
+      startTask: async () => undefined,
+      saveTask: async () => undefined,
+      generate: async (_system, prompt) => {
+        prompts.push(prompt);
+        generation += 1;
+        if (generation === 1) throw new Error('Unterminated string in JSON at position 1566.');
+        return outputs.shift()!;
+      },
+    },
+  );
+  assert.equal(generation, 5);
+  assert.match(prompts[1], /موجزة جداً وصالحة/);
+  assert.equal(pack.qualityReview.readyForOwner, true);
+});
