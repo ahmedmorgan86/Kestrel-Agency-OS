@@ -142,7 +142,9 @@ async function createProductionRun(p,{niche,audience,platform,format,userId,pare
 }
 export default async function handler(req,res){
   res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
-  const path=new URL(req.url,'https://local.invalid').pathname.replace(/^\/api\/?/,'').replace(/\/$/,'');
+  const requestUrl=new URL(req.url,'https://local.invalid');
+  const routedMorganPath=requestUrl.searchParams.get('morganRoute');
+  const path=routedMorganPath!==null?`morgan-production/${routedMorganPath}`:requestUrl.pathname.replace(/^\/api\/?/,'').replace(/\/$/,'');
   try { const p=db();await ensureSchema(p);
     if(path==='healthz'&&req.method==='GET'){await p.query('SELECT 1');return respond(res,200,{ok:true,service:'morgan-group',database:'connected',scope:'core'});}
     if(path==='auth/status'&&req.method==='GET'){const c=await p.query('SELECT count(*)::int AS count FROM users WHERE status=$1',['active']);const user=await signedIn(req,p);return respond(res,200,{initialized:c.rows[0].count>0,authenticated:!!user,user:user?{id:user.id,organizationId:user.organization_id,email:user.email,fullName:user.full_name,status:user.status,roles:['super_admin'],permissions:['*']}:null});}
