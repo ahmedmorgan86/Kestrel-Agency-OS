@@ -158,7 +158,7 @@ export default async function handler(req,res){
     if(path==='morgan-production/readiness'&&req.method==='GET'){
       const worker=(await p.query('SELECT model,healthy,detail,last_seen_at FROM morgan_production_worker WHERE id=$1',[ORG])).rows[0];
       const ready=Boolean(worker?.healthy&&Date.now()-new Date(worker.last_seen_at).getTime()<45000);
-      return respond(res,200,{ready,model:worker?.model||null,detail:ready?'عامل الإنتاج المحلي متصل.':'عامل الإنتاج المجاني على جهازك غير متصل. شغّل خادم الشركة محلياً بعد ضبط DATABASE_URL وOllama.',scope:'neon-queue'});
+      return respond(res,200,{ready,model:worker?.model||null,detail:ready?'عامل الإنتاج المجاني متصل بقاعدة Neon.':'عامل الإنتاج المجاني غير متصل بقاعدة Neon. شغّل عامل الإنتاج على جهاز متصل بقاعدة البيانات ومحرك Ollama.',lastSeenAt:worker?.last_seen_at||null,scope:'neon-queue'});
     }
     if(path==='morgan-production'&&req.method==='GET'){
       const r=await p.query('SELECT * FROM morgan_production_runs WHERE organization_id=$1 ORDER BY created_at DESC LIMIT 40',[ORG]);

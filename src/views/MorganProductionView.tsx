@@ -110,9 +110,10 @@ export function MorganProductionView() {
     <ErrorBanner message={error} onDismiss={() => setError(null)} />
     {notice && <div role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">{notice}</div>}
 
-    <div className={`rounded-xl border p-4 text-sm ${readiness?.ready ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100' : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100'}`}>
+    <div role="status" className={`rounded-xl border p-4 text-sm ${readiness?.ready ? 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100' : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100'}`}>
       <div className="font-semibold">{readiness?.ready ? 'محرك الذكاء الاصطناعي جاهز' : 'محرك الذكاء الاصطناعي غير جاهز'}</div>
       <p className="mt-1">{readiness?.detail || 'جارٍ التحقق من محرك الكتابة ومصادر البحث.'} {readiness?.model ? `النموذج: ${readiness.model}.` : ''}</p>
+      {readiness?.lastSeenAt && <p className="mt-1 text-xs opacity-75">آخر اتصال بعامل الإنتاج: {new Date(readiness.lastSeenAt).toLocaleString('ar-EG')}</p>}
     </div>
 
     <Panel title="ابدأ إنتاجاً جديداً">
@@ -136,7 +137,7 @@ export function MorganProductionView() {
         <div className="md:col-span-2 flex justify-start">
           <button type="submit" disabled={busy || !readiness?.ready} className={`${PRIMARY_BTN} disabled:cursor-not-allowed disabled:opacity-50`}><Play className="h-4 w-4" /> ابدأ البحث والإنتاج</button>
         </div>
-        {!readiness?.ready && <p className="md:col-span-2 text-xs text-slate-500">لن يبدأ طلب ناقص أو وهمي. ثبت Ollama والنموذج المجاني على جهاز تشغيل الخادم المحلي ثم أعد المحاولة. النسخة السحابية لا تتصل بجهازك المحلي.</p>}
+        {!readiness?.ready && <p className="md:col-span-2 text-xs text-slate-500">لن ينشئ النظام طلباً وهمياً. يلزم تشغيل عامل إنتاج مجاني متصل بقاعدة Neon وبمحرك Ollama، ثم سيظهر هنا أنه جاهز.</p>}
       </form>
     </Panel>
 
