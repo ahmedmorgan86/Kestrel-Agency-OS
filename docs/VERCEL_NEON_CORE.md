@@ -19,7 +19,9 @@ PostgreSQL TLS certificate verification must stay enabled. Academy enrollment ac
 
 ## Vercel configuration
 
-Store `DATABASE_URL` as a sensitive environment variable on the deployment branch. Do not put connection strings in repository files or client-side `VITE_` variables. The current Neon connection is scoped to the preview branch; production has not been enabled.
+Store `DATABASE_URL` as a sensitive Vercel environment variable for the intended preview branch. Do not put connection strings in repository files or client-side `VITE_` variables. As audited on 2026-11-23, the Vercel project had branch-scoped `DATABASE_URL` variables for three older Preview branches and no Production database variable. A separate Neon project, `morgan-group-content`, was created on the Free plan for this review branch only, and its connection string is stored as a sensitive Preview-only variable scoped to `codex/morgan-group-real-ops`. This review database is isolated from the pre-existing Neon project. No Production Vercel variable or Production database was changed. The full Express API has not moved to Neon.
+
+The local Express runtime still uses SQLite through `SQLITE_DB_PATH`; its migration and worker stack is separate. The Vercel catch-all uses Neon/PostgreSQL only for the limited routes listed above. Keep new Neon preview credentials on Preview targets and do not point unreviewed migrations at the production environment.
 
 ## Scope
 
