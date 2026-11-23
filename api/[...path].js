@@ -157,8 +157,16 @@ export default async function handler(req,res){
     const user=await signedIn(req,p);if(!user)return respond(res,401,{error:'سجّل الدخول أولًا.'});
     if(path==='morgan-production/readiness'&&req.method==='GET'){
       const worker=(await p.query('SELECT model,healthy,detail,last_seen_at FROM morgan_production_worker WHERE id=$1',[ORG])).rows[0];
-      const ready=Boolean(worker?.healthy&&Date.now()-new Date(worker.last_seen_at).getTime()<45000);
-      return respond(res,200,{ready,model:worker?.model||null,detail:ready?'عامل الإنتاج المجاني متصل بقاعدة Neon.':'عامل الإنتاج المجاني غير متصل بقاعدة Neon. شغّل عامل الإنتاج على جهاز متصل بقاعدة البيانات ومحرك Ollama.',lastSeenAt:worker?.last_seen_at||null,scope:'neon-queue'});
+      const workerConnected=Boolean(worker&&Date.now()-new Date(worker.last_seen_at).getTime()<45000);
+      const ready=Boolean(worker?.healthy&&workerConnected);
+      const detail=ready
+        ? 'العامل والنموذج جاهزان ومتصلان بقاعدة Neon.'
+        : !workerConnected
+          ? 'لم يصل اتصال حديث من عامل الإنتاج. شغّل العامل على جهاز متصل بقاعدة Neon وOllama.'
+          : /not installed/i.test(worker.detail||'')
+            ? `العامل متصل بقاعدة Neon، لكن نموذج ${worker.model} لم يكتمل تثبيته على Ollama بعد.`
+            : `العامل متصل بقاعدة Neon، لكن نموذج ${worker.model} لم يؤكد جاهزيته بعد.`;
+      return respond(res,200,{ready,workerConnected,model:worker?.model||null,detail,lastSeenAt:worker?.last_seen_at||null,scope:'neon-queue'});
     }
     if(path==='morgan-production'&&req.method==='GET'){
       const r=await p.query('SELECT * FROM morgan_production_runs WHERE organization_id=$1 ORDER BY created_at DESC LIMIT 40',[ORG]);

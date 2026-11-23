@@ -1,0 +1,78 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { buildMorganProductionPack } from '../server/services/neonMorganWorker';
+import type { TrendSource } from '../server/services/morganProduction';
+
+const source: TrendSource = {
+  id: 'source_1',
+  title: 'اتجاه حديث في التعليم الرقمي',
+  url: 'https://news.google.com/rss/articles/example',
+  publisher: 'مصدر تعليمي',
+  publishedAt: '2026-11-23T10:00:00.000Z',
+  snippet: 'تقرير حديث عن أدوات التعلم.',
+};
+
+test('Neon production completes separate specialist stages and hands each result forward', async () => {
+  const strategy = { contentAngle: 'زاوية تعليمية', audienceInsight: 'طلاب يبحثون عن أمثلة عملية' };
+  const content = { title: 'عنوان عربي', caption: 'نص عربي واضح', hashtags: ['#تعليم'], factsToVerify: ['رقم يحتاج مراجعة'] };
+  const creative = { visualDirection: 'تصوير شاشة مع شرح', storyboard: [{ number: 1, description: 'عرض المثال' }], onScreenText: ['ابدأ بالتجربة'], assetChecklist: ['لقطة شاشة'] };
+  const qa = { readyForOwner: true, languageIssues: [], unsupportedClaims: [], policyRisks: [], recommendations: [] };
+  const outputs = [strategy, content, creative, qa];
+  const trace: string[] = [];
+  const prompts: string[] = [];
+
+  const pack = await buildMorganProductionPack(
+    { niche: 'التعليم الرقمي', audience: 'طلاب الجامعات', platform: 'instagram', format: 'reel', review_note: 'اختصر المقدمة' },
+    [source],
+    {
+      startTask: async (employee) => { trace.push(`start:${employee}`); },
+      saveTask: async (employee, result) => {
+        trace.push(`save:${employee}`);
+        assert.ok(result && typeof result === 'object');
+      },
+      generate: async (_system, prompt) => {
+        prompts.push(prompt);
+        trace.push(`generate:${prompts.length}`);
+        const output = outputs.shift();
+        assert.ok(output);
+        return output;
+      },
+    },
+  );
+
+  assert.deepEqual(trace, [
+    'start:ياسر عبدالله', 'generate:1', 'save:ياسر عبدالله',
+    'start:مازن حسن', 'generate:2', 'save:مازن حسن',
+    'start:آدم زيدان', 'generate:3', 'save:آدم زيدان',
+    'start:فادي منير', 'generate:4', 'save:فادي منير',
+  ]);
+  assert.match(prompts[0], /التعليم الرقمي/);
+  assert.match(prompts[1], /زاوية تعليمية/);
+  assert.match(prompts[1], /اختصر المقدمة/);
+  assert.match(prompts[2], /نص عربي واضح/);
+  assert.match(prompts[3], /لقطة شاشة/);
+  assert.equal((pack.content as Record<string, unknown>).title, 'عنوان عربي');
+  assert.deepEqual(pack.content.hashtags, ['#تعليم']);
+  assert.equal(pack.qualityReview.readyForOwner, true);
+});
+
+test('Neon production stops before creative work when the writer returns an incomplete draft', async () => {
+  const started: string[] = [];
+  let generation = 0;
+
+  await assert.rejects(() => buildMorganProductionPack(
+    { niche: 'تعليم البرمجة', platform: 'youtube', format: 'short_video' },
+    [source],
+    {
+      startTask: async (employee) => { started.push(employee); },
+      saveTask: async () => undefined,
+      generate: async () => {
+        generation += 1;
+        return generation === 1 ? { contentAngle: 'تعليم عملي' } : { title: '', caption: '' };
+      },
+    },
+  ), /لم ينتج عنواناً ونصاً صالحين/);
+
+  assert.deepEqual(started, ['ياسر عبدالله', 'مازن حسن']);
+  assert.equal(generation, 2);
+});
