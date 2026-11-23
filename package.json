@@ -7,6 +7,7 @@
     "dev": "tsx server.ts",
     "start": "tsx server.ts",
     "start:production": "node --import tsx server.ts",
+    "worker:morgan": "tsx scripts/runMorganWorker.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
