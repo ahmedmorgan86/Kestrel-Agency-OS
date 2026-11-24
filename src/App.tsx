@@ -203,7 +203,7 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-sm text-slate-600 dark:text-slate-400">
-        Loading {brand.name}...
+        جارٍ تجهيز {brand.name}...
       </div>
     );
   }
