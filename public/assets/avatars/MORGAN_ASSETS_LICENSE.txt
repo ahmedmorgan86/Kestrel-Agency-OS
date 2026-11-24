@@ -1,0 +1,10 @@
+The 3D colleague models in this folder were generated with Ara 3D Gen
+(https://github.com/TuriaArt/3d-gen-TU) from MakeHuman character assets.
+
+The MakeHuman base mesh, morph targets, skeleton, skins, eyes, hair and clothing
+assets are released under CC0 1.0 Universal:
+https://creativecommons.org/publicdomain/zero/1.0/
+
+The exported GLB models were optimized for web delivery (WebP textures and
+Meshopt geometry compression). They may be used in commercial and
+non-commercial projects without attribution.
