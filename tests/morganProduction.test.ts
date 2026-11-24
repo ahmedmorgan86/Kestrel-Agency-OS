@@ -7,7 +7,7 @@ import path from 'node:path';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createServer, type Server } from 'node:http';
-import { parseNewsRss } from '../server/services/morganProduction';
+import { parseGoogleTrendsRss, parseNewsRss } from '../server/services/morganProduction';
 import { closeDatabase, initDatabase } from '../server/db/database';
 import { runMigrations } from '../server/db/migrations';
 import { seedSystemConfiguration } from '../server/db/seed';
@@ -52,6 +52,26 @@ test('deduplicates repeated headlines and caps fetched signals at ten', () => {
   const sources = parseNewsRss(`<rss><channel>${items}</channel></rss>`, Date.parse('2026-11-23T12:00:00.000Z'));
   assert.equal(sources.length, 10);
   assert.equal(sources.filter((source) => source.title === 'عنوان مكرر').length, 1);
+});
+
+test('parses Egyptian Google Trends search signals separately from their related news', () => {
+  const now = Date.parse('2026-11-24T12:00:00.000Z');
+  const xml = `<?xml version="1.0"?><rss xmlns:ht="https://trends.google.com/trending/rss"><channel>
+    <item><title>اتجاه بحث حديث</title><ht:approx_traffic>1K+</ht:approx_traffic><pubDate>Tue, 24 Nov 2026 10:00:00 GMT</pubDate>
+      <ht:news_item><ht:news_item_title>تغطية مرتبطة بالاتجاه</ht:news_item_title><ht:news_item_url>https://example.com/story</ht:news_item_url><ht:news_item_source>ناشر مصري</ht:news_item_source></ht:news_item>
+    </item>
+    <item><title>اتجاه قديم</title><ht:approx_traffic>5K+</ht:approx_traffic><pubDate>Sat, 21 Nov 2026 10:00:00 GMT</pubDate></item>
+    <item><title>اتجاه بلا تاريخ</title><ht:approx_traffic>500+</ht:approx_traffic></item>
+  </channel></rss>`;
+  const sources = parseGoogleTrendsRss(xml, now);
+  assert.equal(sources.length, 1);
+  assert.equal(sources[0].sourceType, 'search_trend');
+  assert.equal(sources[0].approxTraffic, '1K+');
+  assert.match(sources[0].url, /^https:\/\/trends\.google\.com\/trends\/explore\?/);
+  assert.equal(sources[0].relatedArticles?.[0].title, 'تغطية مرتبطة بالاتجاه');
+  assert.equal(sources[0].relatedArticles?.[0].publisher, 'ناشر مصري');
+  assert.equal(sources[0].relatedArticles?.[0].url, 'https://example.com/story');
+  assert.match(sources[0].snippet, /تقدير Google Trends/);
 });
 
 test('production assigns a task-sized AI team and binds owner decisions to the exact saved version', async (t) => {

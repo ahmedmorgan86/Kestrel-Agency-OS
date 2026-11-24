@@ -14,7 +14,7 @@ The private production queue is stored in Neon. A Vercel API request creates a r
 
 The worker claims a run with a ten-minute database lease and renews it while processing. An interrupted run is reclaimed from the research stage, with partial task outputs cleared. After three interrupted attempts, the run is marked failed and its unfinished tasks are closed; the owner can explicitly retry it when the worker is healthy.
 
-The current search source is Google News' public Arabic RSS feed, filtered to recent items and linked to each source. These are current news-topic signals, not official TikTok, Instagram, YouTube, or Facebook trend measurements. The app must show the worker as unavailable and keep production disabled if Neon, Ollama, or the configured free local model is unavailable.
+Research combines Google's public Egyptian trending-search RSS feed with recent Arabic Google News RSS results for the selected niche. Google Trends items keep their approximate search-traffic label and related article links; they indicate public search interest, not TikTok, Instagram, YouTube, or Facebook engagement. Either feed may be unavailable while the other still supplies sources; production stops with an Arabic error only when both fail or return no usable items. The app must show the worker as unavailable and keep production disabled if Neon, Ollama, or the configured free local model is unavailable.
 
 ## Free local operation
 
