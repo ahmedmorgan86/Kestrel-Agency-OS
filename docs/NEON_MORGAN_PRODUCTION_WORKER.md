@@ -12,6 +12,7 @@
 
 - ثبّت Ollama من موقعه الرسمي، ثم نزّل النموذج المجاني المفتوح `qwen3.5:4b` باستخدام `ollama pull qwen3.5:4b`.
 - انسخ قيمة الاتصال الحساسة لقاعدة Neon المسماة `morgan_pipeline_review` في فرع المعاينة إلى `.env.worker.local` تحت الاسم `MORGAN_WORKER_DATABASE_URL`. هذا الملف مستثنى من Git. العامل لا يرث `DATABASE_URL` العام، ويرفض أي قاعدة أخرى ما لم يُسمح بالإنتاج صراحةً.
+- لواجهة Vercel، خزّن `DATABASE_URL` كسرّ لبيئة Preview ومربوط بفرع المراجعة فقط، وبقاعدة `morgan_pipeline_review`. بعد تغيير السر أعد نشر المعاينة؛ لا تضعه في بيئة Production أو في جميع فروع المعاينة.
 - اضبط `MORGAN_NEON_WORKER_ENABLED=true` في `.env.local`.
 - شغّل العامل المستقل بالأمر `npm run worker:morgan`. يتحقق من Ollama كل خمس ثوانٍ ويرسل نبضة صحة إلى Neon؛ صفحة الإنتاج لا تقبل تشغيل طلب ما لم تكن النبضة حديثة.
 - عند هذا الجهاز أُعدّت مهمة Windows باسم `MORGAN GROUP Neon Worker` لتشغيل العامل بعد تسجيل الدخول. لإيقافها استخدم "Task Scheduler" ثم أوقف المهمة، أو أنهِ أمر العامل يدوياً من الجلسة.
