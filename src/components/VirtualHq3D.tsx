@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinnedModel } from 'three/addons/utils/SkeletonUtils.js';
 import { Camera, ChevronDown, ChevronUp, Compass, Layers, RotateCcw } from 'lucide-react';
 import type { AvatarConfig, OperationalStatus, ZoneRect } from '../domain/hq';
@@ -65,15 +66,15 @@ interface HumanoidAsset {
   animations: THREE.AnimationClip[];
 }
 
-const HUMAN_ASSETS = ['casual-walker', 'dog-walker', 'hiker', 'road-worker'];
+const EMPLOYEE_ASSETS = Array.from({ length: 8 }, (_, index) => `morgan-colleague-${String(index + 1).padStart(2, '0')}`);
 
-interface AnimatedHuman {
+interface AnimatedEmployee {
   root: THREE.Group;
   model: THREE.Object3D;
   mixer: THREE.AnimationMixer;
   desiredAction: THREE.AnimationAction;
   walkAction: THREE.AnimationAction | null;
-  status: OperationalStatus;
+  animationPhase: number;
   startPosition: THREE.Vector3;
   targetPosition: THREE.Vector3;
   startRotationY: number;
@@ -81,12 +82,11 @@ interface AnimatedHuman {
   transitionDuration: number;
   transitionProgress: number;
   inTransition: boolean;
-  isSeated: boolean;
 }
 
 const CAMERA_PRESETS: CameraPreset[] = [
   { id: 'atrium', label: 'البهو', pos: [0, 8, 7], target: [0, 1.35, 22] },
-  { id: 'people', label: 'مساحة الفريق', pos: [0, 11, 31], target: [0, 1, 8] },
+  { id: 'people', label: 'مساحة الفريق', pos: [0, 8, 21], target: [0, 1.2, 6] },
   { id: 'overview', label: 'نظرة عامة', pos: [0, 13, 32], target: [0, 1.1, 5] },
   { id: 'reception', label: 'الاستقبال', pos: [0, 7, 34], target: [0, 1.2, 19] },
   { id: 'executive', label: 'الإدارة', pos: [0, 8, 4], target: [0, 1.4, -15] },
@@ -623,24 +623,31 @@ function buildRiggedHumanGroup(
     new THREE.MeshBasicMaterial({ visible: false })
   );
   hitMesh.position.y = 0.92;
-  hitMesh.userData.hqSelection = { kind: 'human', id: actor.id, label: actor.name } satisfies Hq3DSelection;
+  hitMesh.userData.hqSelection = { kind: actor.actorType, id: actor.id, label: actor.name } satisfies Hq3DSelection;
   root.add(hitMesh);
-  root.userData.hqSelection = { kind: 'human', id: actor.id, label: actor.name } satisfies Hq3DSelection;
+  root.userData.hqSelection = { kind: actor.actorType, id: actor.id, label: actor.name } satisfies Hq3DSelection;
   root.userData.actorStatus = actor.operationalStatus;
 
   const mixer = new THREE.AnimationMixer(model);
-  const animationName = actor.operationalStatus === 'queued'
-    ? 'walk'
-    : actor.operationalStatus === 'in_meeting'
-    ? 'look_around'
-    : 'idle';
-  const clip = asset.animations.find((item) => item.name.toLowerCase() === animationName) ?? asset.animations[0];
-  const desiredAction = clip ? mixer.clipAction(clip) : mixer.clipAction(new THREE.AnimationClip('idle', 1, []));
+  const shouldSit = ['working', 'validating', 'in_meeting', 'waiting_for_approval'].includes(actor.operationalStatus);
+  const clip = actor.operationalStatus === 'queued'
+    ? asset.animations.find((item) => item.name.toLowerCase() === 'walk')
+    : shouldSit
+      ? asset.animations.find((item) => item.name.toLowerCase().includes('sit'))
+      : asset.animations.find((item) => item.name.toLowerCase() === 'idle') ?? asset.animations[0];
+  const desiredClip = clip ?? asset.animations.find((item) => item.name.toLowerCase() === 'idle') ?? asset.animations[0];
+  const desiredAction = desiredClip ? mixer.clipAction(desiredClip) : mixer.clipAction(new THREE.AnimationClip('idle', 1, []));
   const walkClip = asset.animations.find((item) => item.name.toLowerCase() === 'walk');
   const walkAction = walkClip ? mixer.clipAction(walkClip) : null;
-  if (startsWalking && walkAction) walkAction.play();
-  else desiredAction.play();
-  return { root, model, mixer, desiredAction, walkAction };
+  const animationPhase = (stableActorHash(`${actor.id}:animation-phase`) / 0xffffffff);
+  if (startsWalking && walkAction) {
+    walkAction.time = walkAction.getClip().duration * animationPhase;
+    walkAction.play();
+  } else {
+    desiredAction.time = desiredAction.getClip().duration * animationPhase;
+    desiredAction.play();
+  }
+  return { root, model, mixer, desiredAction, walkAction, animationPhase };
 }
 
 export function VirtualHq3D({
@@ -658,7 +665,7 @@ export function VirtualHq3D({
 }: VirtualHq3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
-  const [activePreset, setActivePreset] = useState<string>('overview');
+  const [activePreset, setActivePreset] = useState<string>('people');
   const [dockExpanded, setDockExpanded] = useState<boolean>(true);
   const [contextLost, setContextLost] = useState<boolean>(false);
   const [webglFailed, setWebglFailed] = useState<boolean>(false);
@@ -667,9 +674,10 @@ export function VirtualHq3D({
 
   useEffect(() => {
     const loader = new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
     let active = true;
     void Promise.allSettled(
-      HUMAN_ASSETS.map(async (slug) => {
+      EMPLOYEE_ASSETS.map(async (slug) => {
         const gltf = await loader.loadAsync(`/assets/avatars/${slug}.glb`);
         return { slug, scene: gltf.scene, animations: gltf.animations } satisfies HumanoidAsset;
       })
@@ -677,7 +685,7 @@ export function VirtualHq3D({
       if (!active) return;
       const loaded = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
       if (loaded.length) setHumanoidAssets(loaded);
-      if (loaded.length !== HUMAN_ASSETS.length) {
+      if (loaded.length !== EMPLOYEE_ASSETS.length) {
         console.warn('Some licensed 3D employee models did not load; using the built-in fallback model.');
       }
     });
@@ -689,8 +697,8 @@ export function VirtualHq3D({
     target: THREE.Vector3;
     active: boolean;
   }>({
-    pos: new THREE.Vector3(0, 13, 32),
-    target: new THREE.Vector3(0, 1.1, 5),
+    pos: new THREE.Vector3(0, 8, 21),
+    target: new THREE.Vector3(0, 1.2, 6),
     active: false,
   });
 
@@ -781,12 +789,21 @@ export function VirtualHq3D({
     scene.environment = envTarget.texture;
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.25, 220);
-    camera.position.set(0, 13, 32);
+    const selectedActor = actors.find((actor) => actor.id === selectedId);
+    camera.position.set(
+      selectedActor?.worldPosition.x ?? 0,
+      selectedActor ? 5.5 : 8,
+      selectedActor ? selectedActor.worldPosition.z + 8.5 : 21
+    );
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
-    controls.target.set(0, 1.1, 5);
+    controls.target.set(
+      selectedActor?.worldPosition.x ?? 0,
+      selectedActor ? 0.95 : 1.2,
+      selectedActor?.worldPosition.z ?? 6
+    );
     controls.minDistance = 8;
     controls.maxDistance = 68;
     controls.maxPolarAngle = Math.PI * 0.46;
@@ -828,7 +845,7 @@ export function VirtualHq3D({
     const disposableTextures: THREE.Texture[] = [];
     const interactables: THREE.Object3D[] = [];
     const animatedAvatars: THREE.Group[] = [];
-    const animatedHumans: AnimatedHuman[] = [];
+    const animatedEmployees: AnimatedEmployee[] = [];
     // Main architectural concrete floor plate
     const floorTex = makeFloorGridTexture(isDark, maxAnisotropy);
     disposableTextures.push(floorTex);
@@ -1271,9 +1288,8 @@ export function VirtualHq3D({
 
     // Place three-dimensional staff and AI colleagues at their current work or meeting positions.
     for (const actor of actors) {
-      if (actor.actorType === 'human' && humanoidAssets.length > 0) {
+      if (humanoidAssets.length > 0) {
         const asset = humanoidAssets[stableActorHash(actor.id) % humanoidAssets.length];
-        const isSeated = ['working', 'validating', 'in_meeting', 'waiting_for_approval'].includes(actor.operationalStatus);
         const atSeat = actor.operationalStatus === 'in_meeting' || actor.worldPosition.zoneId === 'zone_approval_waiting';
         const offsetZ = atSeat ? 0 : actor.worldPosition.rotY === 0 ? 0.35 : -0.35;
         const targetPosition = new THREE.Vector3(
@@ -1292,12 +1308,10 @@ export function VirtualHq3D({
         human.root.rotation.y = startRotationY;
         human.model.rotation.y = 0;
         human.model.scale.setScalar(0.96 + (stableActorHash(`${actor.id}:height`) % 9) * 0.01);
-        if (isSeated) human.model.position.y = -0.36;
         scene.add(human.root);
         interactables.push(human.root);
-        animatedHumans.push({
+        animatedEmployees.push({
           ...human,
-          status: actor.operationalStatus,
           startPosition,
           targetPosition,
           startRotationY,
@@ -1305,7 +1319,6 @@ export function VirtualHq3D({
           transitionDuration: Math.max(0.65, Math.min(3, distance / 1.25)),
           transitionProgress: startsWalking ? 0 : 1,
           inTransition: startsWalking,
-          isSeated,
         });
         actorPositionsRef.current.set(actor.id, { position: targetPosition.clone(), rotationY: targetRotationY });
         continue;
@@ -1363,6 +1376,16 @@ export function VirtualHq3D({
         const sel = resolveSelection(hits[0].object);
         if (sel) {
           onSelectRef.current(sel);
+          if (sel.kind === 'human' || sel.kind === 'agent') {
+            const focus = hits[0].object.getWorldPosition(new THREE.Vector3());
+            focus.y = 0.95;
+            const viewDirection = camera.position.clone().sub(controls.target).normalize();
+            cameraGoalRef.current.target.copy(focus);
+            cameraGoalRef.current.pos.copy(focus).addScaledVector(viewDirection, 8.5);
+            cameraGoalRef.current.active = true;
+            setActivePreset('focus');
+            requestRenderRef.current();
+          }
         }
       }
     };
@@ -1468,7 +1491,7 @@ export function VirtualHq3D({
         }
       }
 
-      // Agents keep their restrained task indicators; human movement uses the rigged CC0 skeletons.
+      // All employees use their rigged animations; low-cost status indicators remain visible above the team.
       if (!reducedMotion && animatedAvatars.length > 0) {
         for (let i = 0; i < animatedAvatars.length; i += 1) {
           const av = animatedAvatars[i];
@@ -1481,9 +1504,9 @@ export function VirtualHq3D({
         keepAnimating = true;
       }
 
-      if (!reducedMotion && animatedHumans.length > 0) {
-        for (let i = 0; i < animatedHumans.length; i += 1) {
-          const person = animatedHumans[i];
+      if (!reducedMotion && animatedEmployees.length > 0) {
+        for (let i = 0; i < animatedEmployees.length; i += 1) {
+          const person = animatedEmployees[i];
           person.mixer.update(dt);
 
           if (person.inTransition && person.walkAction) {
@@ -1498,41 +1521,7 @@ export function VirtualHq3D({
               person.inTransition = false;
               person.walkAction.fadeOut(0.22);
               person.desiredAction.reset().fadeIn(0.22).play();
-            }
-          }
-
-          if (person.isSeated) {
-            // A simple seated pose at the actual meeting chair or work station, on the asset's 56-bone rig.
-            const leftThigh = person.model.getObjectByName('thigh_L');
-            const rightThigh = person.model.getObjectByName('thigh_R');
-            const leftCalf = person.model.getObjectByName('calf_L');
-            const rightCalf = person.model.getObjectByName('calf_R');
-            const leftUpperArm = person.model.getObjectByName('upperarm_L');
-            const rightUpperArm = person.model.getObjectByName('upperarm_R');
-            const leftForearm = person.model.getObjectByName('forearm_L');
-            const rightForearm = person.model.getObjectByName('forearm_R');
-            const head = person.model.getObjectByName('head');
-
-            if (leftThigh) leftThigh.rotation.x = 0.95;
-            if (rightThigh) rightThigh.rotation.x = 0.95;
-            if (leftCalf) leftCalf.rotation.x = -1.12;
-            if (rightCalf) rightCalf.rotation.x = -1.12;
-            if (person.status === 'working' || person.status === 'validating') {
-              const typing = Math.sin(elapsed * 8 + i) * 0.035;
-              if (leftUpperArm) leftUpperArm.rotation.x = -0.22 + typing;
-              if (rightUpperArm) rightUpperArm.rotation.x = -0.22 - typing;
-              if (leftForearm) leftForearm.rotation.x = -0.48 - typing;
-              if (rightForearm) rightForearm.rotation.x = -0.48 + typing;
-              if (head) head.rotation.x = 0.08 + Math.sin(elapsed * 0.7 + i) * 0.025;
-            } else {
-              if (leftUpperArm) leftUpperArm.rotation.x = 0.08 + Math.sin(elapsed * 1.1 + i) * 0.04;
-              if (rightUpperArm) rightUpperArm.rotation.x = 0.08 - Math.sin(elapsed * 1.1 + i) * 0.04;
-              if (leftForearm) leftForearm.rotation.x = -0.12;
-              if (rightForearm) rightForearm.rotation.x = -0.12;
-              if (head) {
-                head.rotation.y = Math.sin(elapsed * 0.55 + i * 2) * 0.12;
-                head.rotation.x = Math.sin(elapsed * 0.8 + i) * 0.035;
-              }
+              person.desiredAction.time = person.desiredAction.getClip().duration * person.animationPhase;
             }
           }
 
