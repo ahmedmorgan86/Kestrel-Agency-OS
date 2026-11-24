@@ -5,6 +5,8 @@ import { selectMorganProductionTeam } from '../../shared/morganProductionTeam.js
 
 const ORGANIZATION_ID = 'org_kestrel_agency';
 const WORKER_ID = `morgan_local_${process.pid}`;
+const MAX_RUN_ATTEMPTS = 3;
+const RUN_LEASE_MINUTES = 10;
 let pool: Pool | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -85,9 +87,23 @@ async function claimRun() {
   const client = await databasePool().connect();
   try {
     await client.query('BEGIN');
-    const run = (await client.query("SELECT * FROM morgan_production_runs WHERE organization_id=$1 AND status='queued' ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED", [ORGANIZATION_ID])).rows[0];
+    await client.query(`WITH exhausted AS (
+      UPDATE morgan_production_runs SET status='failed',error_message='انتهت محاولات الاسترداد بعد توقف عامل الإنتاج.',completed_at=now(),worker_id=NULL,lease_expires_at=NULL,updated_at=now()
+      WHERE organization_id=$1 AND status IN ('researching','producing') AND lease_expires_at < now() AND attempt_count >= $2 RETURNING id
+    ) UPDATE morgan_production_tasks t SET status='failed',updated_at=now()
+      FROM exhausted e WHERE t.run_id=e.id AND t.status IN ('queued','running')`, [ORGANIZATION_ID, MAX_RUN_ATTEMPTS]);
+    const run = (await client.query(`SELECT * FROM morgan_production_runs
+      WHERE organization_id=$1 AND (status='queued' OR (status IN ('researching','producing') AND lease_expires_at < now() AND attempt_count < $2))
+      ORDER BY COALESCE(lease_expires_at,created_at),created_at LIMIT 1 FOR UPDATE SKIP LOCKED`, [ORGANIZATION_ID, MAX_RUN_ATTEMPTS])).rows[0];
     if (!run) { await client.query('COMMIT'); return null; }
-    await client.query("UPDATE morgan_production_runs SET status='researching',updated_at=now() WHERE id=$1", [run.id]);
+    if (run.status !== 'queued') {
+      // A lease-expired run restarts from research. Clear partial task outputs so
+      // no stale stage can be mistaken for work completed by this attempt.
+      await client.query("UPDATE morgan_production_tasks SET status='queued',result_json='{}'::jsonb,updated_at=now() WHERE run_id=$1", [run.id]);
+    }
+    await client.query(`UPDATE morgan_production_runs SET status='researching',worker_id=$2,
+      lease_expires_at=now()+($3::text || ' minutes')::interval,attempt_count=attempt_count+1,updated_at=now() WHERE id=$1`,
+    [run.id, WORKER_ID, RUN_LEASE_MINUTES]);
     await client.query("UPDATE morgan_production_tasks t SET status='running',updated_at=now() FROM employees e WHERE t.employee_id=e.id AND t.run_id=$1 AND e.full_name='نورا خليل'", [run.id]);
     await client.query('COMMIT');
     return run as Record<string, any>;
@@ -96,15 +112,25 @@ async function claimRun() {
 }
 
 async function writeTaskResult(runId: string, employeeName: string, result: unknown) {
+  await refreshRunLease(runId);
   const updated = await databasePool().query(`UPDATE morgan_production_tasks t SET status='completed',result_json=$1,updated_at=now()
     FROM employees e WHERE t.employee_id=e.id AND t.run_id=$2 AND e.full_name=$3`, [JSON.stringify(result), runId, employeeName]);
   if (updated.rowCount !== 1) throw new Error(`تعذر حفظ نتيجة مهمة الموظف ${employeeName}.`);
 }
 
 async function startTask(runId: string, employeeName: string) {
+  await refreshRunLease(runId);
   const updated = await databasePool().query(`UPDATE morgan_production_tasks t SET status='running',updated_at=now()
     FROM employees e WHERE t.employee_id=e.id AND t.run_id=$1 AND e.full_name=$2 AND t.status='queued'`, [runId, employeeName]);
   if (updated.rowCount !== 1) throw new Error(`تعذر بدء مهمة الموظف ${employeeName}.`);
+}
+
+async function refreshRunLease(runId: string) {
+  const updated = await databasePool().query(`UPDATE morgan_production_runs
+    SET lease_expires_at=now()+($1::text || ' minutes')::interval,updated_at=now()
+    WHERE id=$2 AND worker_id=$3 AND status IN ('researching','producing') RETURNING id`,
+  [RUN_LEASE_MINUTES, runId, WORKER_ID]);
+  if (updated.rowCount !== 1) throw new Error('انتهت ملكية عامل الإنتاج لهذا الطلب؛ أُوقف حفظ المرحلة الحالية لمنع تداخل المحاولات.');
 }
 
 export interface MorganProductionWorkflowDependencies {
@@ -212,16 +238,27 @@ export async function buildMorganProductionPack(
 }
 
 async function processRun(run: Record<string, any>) {
-  const sources = await fetchNicheSources(String(run.niche));
-  await databasePool().query("UPDATE morgan_production_runs SET source_items_json=$1,status='producing',updated_at=now() WHERE id=$2", [JSON.stringify(sources), run.id]);
-  await writeTaskResult(run.id, 'نورا خليل', { niche: run.niche, sources });
-  const pack = await buildMorganProductionPack(run, sources, {
-    startTask: (employeeName) => startTask(run.id, employeeName),
-    saveTask: (employeeName, result) => writeTaskResult(run.id, employeeName, result),
-    generate: generateSpecialist,
-  });
-  const ready = pack.qualityReview.readyForOwner;
-  await databasePool().query("UPDATE morgan_production_runs SET deliverable_json=$1,status=$2,error_message=$3,updated_at=now(),completed_at=now() WHERE id=$4", [JSON.stringify(pack), 'owner_review', ready ? '' : 'مراجعة الجودة توصي بإعادة الإنتاج قبل القبول.', run.id]);
+  const leaseTimer = setInterval(() => {
+    void refreshRunLease(String(run.id)).catch((error) => console.error('morgan_run_lease_refresh_failed', error instanceof Error ? error.message : 'unknown'));
+  }, 30_000);
+  leaseTimer.unref();
+  try {
+    const sources = await fetchNicheSources(String(run.niche));
+    await refreshRunLease(String(run.id));
+    const researching = await databasePool().query("UPDATE morgan_production_runs SET source_items_json=$1,status='producing',updated_at=now() WHERE id=$2 AND worker_id=$3 AND status='researching' RETURNING id", [JSON.stringify(sources), run.id, WORKER_ID]);
+    if (researching.rowCount !== 1) throw new Error('تعذر نقل الطلب إلى مرحلة الإنتاج بعد انتهاء ملكية العامل.');
+    await writeTaskResult(run.id, 'نورا خليل', { niche: run.niche, sources });
+    const pack = await buildMorganProductionPack(run, sources, {
+      startTask: (employeeName) => startTask(run.id, employeeName),
+      saveTask: (employeeName, result) => writeTaskResult(run.id, employeeName, result),
+      generate: generateSpecialist,
+    });
+    const ready = pack.qualityReview.readyForOwner;
+    const finished = await databasePool().query("UPDATE morgan_production_runs SET deliverable_json=$1,status='owner_review',error_message=$2,worker_id=NULL,lease_expires_at=NULL,updated_at=now(),completed_at=now() WHERE id=$3 AND worker_id=$4 AND status='producing' RETURNING id", [JSON.stringify(pack), ready ? '' : 'مراجعة الجودة توصي بإعادة الإنتاج قبل القبول.', run.id, WORKER_ID]);
+    if (finished.rowCount !== 1) throw new Error('تعذر حفظ النسخة النهائية لأن ملكية العامل لم تعد صالحة.');
+  } finally {
+    clearInterval(leaseTimer);
+  }
 }
 
 async function tick() {
@@ -237,8 +274,8 @@ async function tick() {
       try { await processRun(run); }
       catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        await databasePool().query("UPDATE morgan_production_runs SET status='failed',error_message=$1,updated_at=now(),completed_at=now() WHERE id=$2", [message.slice(0, 1000), run.id]);
-        await databasePool().query("UPDATE morgan_production_tasks SET status='failed',updated_at=now() WHERE run_id=$1 AND status IN ('queued','running')", [run.id]);
+        const failed = await databasePool().query("UPDATE morgan_production_runs SET status='failed',error_message=$1,worker_id=NULL,lease_expires_at=NULL,updated_at=now(),completed_at=now() WHERE id=$2 AND worker_id=$3 AND status IN ('researching','producing') RETURNING id", [message.slice(0, 1000), run.id, WORKER_ID]);
+        if (failed.rowCount === 1) await databasePool().query("UPDATE morgan_production_tasks SET status='failed',updated_at=now() WHERE run_id=$1 AND status IN ('queued','running')", [run.id]);
       }
     }
   } catch (error) {

@@ -81,6 +81,10 @@ async function ensureSchema(p) {
     CREATE TABLE IF NOT EXISTS morgan_production_tasks(id text primary key,run_id text not null references morgan_production_runs(id) on delete cascade,employee_id text not null references employees(id) on delete restrict,title text not null,status text not null check(status in ('queued','running','completed','failed')),result_json jsonb not null default '{}'::jsonb,updated_at timestamptz not null default now());
     CREATE TABLE IF NOT EXISTS morgan_production_worker(id text primary key,model text not null,healthy boolean not null default false,detail text not null default '',last_seen_at timestamptz not null default now());
     CREATE TABLE IF NOT EXISTS morgan_production_decisions(id text primary key,run_id text not null references morgan_production_runs(id) on delete cascade,version_hash text not null,decision text not null check(decision in ('accepted','changes_requested')),comments text not null default '',decided_by_user_id text not null references users(id),decided_at timestamptz not null default now());`);
+    await p.query(`ALTER TABLE morgan_production_runs ADD COLUMN IF NOT EXISTS worker_id text;
+      ALTER TABLE morgan_production_runs ADD COLUMN IF NOT EXISTS lease_expires_at timestamptz;
+      ALTER TABLE morgan_production_runs ADD COLUMN IF NOT EXISTS attempt_count integer NOT NULL DEFAULT 0;
+      CREATE INDEX IF NOT EXISTS idx_morgan_production_runs_claim ON morgan_production_runs(organization_id,status,lease_expires_at,created_at);`);
     await p.query('INSERT INTO organizations(id,name) VALUES($1,$2) ON CONFLICT(id) DO NOTHING',[ORG,'MORGAN GROUP']);
     await p.query('UPDATE organizations SET owner_user_id=(SELECT id FROM users WHERE organization_id=$1 ORDER BY created_at ASC LIMIT 1) WHERE id=$1 AND owner_user_id IS NULL',[ORG]);
     for(const [code,name] of departments){

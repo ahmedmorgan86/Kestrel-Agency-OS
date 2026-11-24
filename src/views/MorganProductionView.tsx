@@ -140,6 +140,7 @@ export function MorganProductionView() {
       <p className="mt-1">{readiness?.detail || 'جارٍ التحقق من محرك الكتابة ومصادر البحث.'} {readiness?.model ? `النموذج: ${readiness.model}.` : ''}</p>
       {readiness?.lastSeenAt && <p className="mt-1 text-xs opacity-75">آخر اتصال بعامل الإنتاج: {new Date(readiness.lastSeenAt).toLocaleString('ar-EG')}</p>}
     </div>
+    <p className="text-xs leading-6 text-slate-500">رصد الموضوعات يعتمد حالياً على مصادر أخبار عامة حديثة وروابطها؛ لا يعرض أرقام رواج رسمية من تيك توك أو إنستغرام أو يوتيوب.</p>
 
     <Panel title="ابدأ إنتاجاً جديداً">
       <form onSubmit={start} className="grid gap-4 md:grid-cols-2">
@@ -175,7 +176,7 @@ export function MorganProductionView() {
 
       {!!current.tasks?.length && <Panel title="تكليفات فريق الشركة الافتراضي"><div className="mb-2 text-xs text-slate-500">هذه الشخصيات وسير العمل رقمية. النموذج المحلي ينفذ العمل ويحفظ نتيجة كل تخصص في سجل المهمة.</div><div className="divide-y divide-slate-100 dark:divide-slate-800">{current.tasks.map((task: Run) => <div key={task.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"><span><strong>{task.employee_name || 'موظف'}</strong> · {task.title}</span><span className="text-slate-500">{TASK_STATUS_LABELS[task.status] || 'حالة غير معروفة'}</span></div>)}</div></Panel>}
 
-      {!!current.sources?.length && <Panel title={`مصادر الاتجاهات (${current.sources.length})`}><div className="grid gap-3 md:grid-cols-2">{current.sources.map((source: Run) => <a key={source.id} href={source.url} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 p-3 hover:border-blue-400 dark:border-slate-700"><div className="font-medium">{source.title}</div><div className="mt-1 flex items-center gap-2 text-xs text-slate-500">{source.publisher} · {source.publishedAt ? new Date(source.publishedAt).toLocaleDateString('ar-EG') : 'تاريخ غير متاح'} <ExternalLink className="h-3 w-3" /></div>{source.snippet && <p className="mt-2 text-sm text-slate-600">{source.snippet}</p>}</a>)}</div></Panel>}
+      {!!current.sources?.length && <Panel title={`مصادر وإشارات حديثة (${current.sources.length})`}><div className="grid gap-3 md:grid-cols-2">{current.sources.map((source: Run) => <a key={source.id} href={source.url} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 p-3 hover:border-blue-400 dark:border-slate-700"><div className="font-medium">{source.title}</div><div className="mt-1 flex items-center gap-2 text-xs text-slate-500">{source.publisher} · {source.publishedAt ? new Date(source.publishedAt).toLocaleDateString('ar-EG') : 'تاريخ غير متاح'} <ExternalLink className="h-3 w-3" /></div>{source.snippet && <p className="mt-2 text-sm text-slate-600">{source.snippet}</p>}</a>)}</div></Panel>}
 
       {!!content.title && <>
         <Panel title="استراتيجية المحتوى"><div className="space-y-2 text-sm"><p><strong>الزاوية:</strong> {deliverable.strategy?.contentAngle || '—'}</p><p><strong>هدف المادة:</strong> {deliverable.strategy?.objective || '—'}</p><p><strong>قراءة الجمهور:</strong> {deliverable.strategy?.audienceInsight || '—'}</p></div></Panel>
@@ -192,6 +193,6 @@ export function MorganProductionView() {
     </>}
 
     <Panel title="سجل الإنتاج"><div className="space-y-2">{runs.length ? runs.map((run) => <button key={run.id} type="button" onClick={() => { setActiveRunId(run.id); setReviewNote(''); void loadRun(run.id); }} className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 text-right hover:border-blue-400 dark:border-slate-800"><span><span className="block font-medium">{run.niche}</span><span className="text-xs text-slate-500">{new Date(run.created_at).toLocaleString('ar-EG')} · {PLATFORM_LABELS[run.platform] || 'منصة أخرى'}</span></span><span className="text-sm">{STATUS_LABELS[run.status] || 'حالة غير معروفة'}</span></button>) : <div className="text-sm text-slate-500">لا توجد عمليات إنتاج سابقة.</div>}</div></Panel>
-    <div className="flex items-center gap-2 text-xs text-slate-500"><Sparkles className="h-3.5 w-3.5" /> المصادر حقيقية، ومخرجات الذكاء الاصطناعي موسومة ومسجلة؛ لا يتم النشر تلقائياً.</div>
+    <div className="flex items-center gap-2 text-xs text-slate-500"><Sparkles className="h-3.5 w-3.5" /> المصادر مرتبطة بمراجع فعلية، ومخرجات الذكاء الاصطناعي مسجلة؛ لا يتم النشر تلقائياً.</div>
   </div>;
 }
